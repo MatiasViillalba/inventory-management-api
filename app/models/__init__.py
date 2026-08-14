@@ -2,6 +2,7 @@ from app.models.alert import Alert, AlertStatus, AlertType
 from app.models.inventory import Inventory
 from app.models.movement import Movement, MovementType
 from app.models.product import Product
+from app.models.user import User
 from app.models.warehouse import Warehouse
 
 __all__ = [
@@ -12,5 +13,6 @@ __all__ = [
     "Movement",
     "MovementType",
     "Product",
+    "User",
     "Warehouse",
 ]
