@@ -1,9 +1,11 @@
-"""Read endpoints for inventory (stock level) queries.
+"""Endpoints for inventory (stock level) queries and stock movements.
 
-Backed by InventoryQueryService, the read half of the CQRS split for
-the Inventory aggregate. Inventory records are never created or
-mutated directly through these routes — stock changes happen via the
-Movement-driven write side (POST /inventory), added in a later commit.
+Combines both halves of the CQRS split for the Inventory aggregate:
+GET routes are backed by InventoryQueryService (read-only), and the
+POST route is backed by InventoryCommandService, which applies stock
+changes under row-level locking and appends an immutable Movement
+audit record. Inventory records are never created or mutated directly
+— every stock change goes through a Movement.
 """
 
 import uuid
@@ -11,9 +13,11 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
+from app.core.exceptions import InsufficientStockError, NotFoundError
 from app.core.session import get_db
 from app.schemas.inventory import InventoryRead
+from app.schemas.movement import MovementCreate, MovementRead
+from app.services.inventory_command import InventoryCommandService
 from app.services.inventory_query import InventoryQueryService
 
 router = APIRouter(prefix="/inventory", tags=["Inventory"])
@@ -80,3 +84,41 @@ async def get_stock_level(
             status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
         ) from exc
     return InventoryRead.model_validate(record)
+
+
+@router.post("", response_model=MovementRead, status_code=status.HTTP_201_CREATED)
+async def record_movement(
+    data: MovementCreate,
+    db: AsyncSession = Depends(get_db),
+) -> MovementRead:
+    """Apply a stock movement (add, remove, or transfer) and record it.
+
+    Which warehouse fields are required depends on movement_type — see
+    MovementCreate for the exact rules. The affected inventory row(s)
+    are locked for the duration of the operation, and an immutable
+    Movement record is appended as the audit trail.
+
+    Args:
+        data: Validated movement payload (IN, OUT, or TRANSFER).
+        db: Injected async database session.
+
+    Returns:
+        MovementRead: The newly created movement record.
+
+    Raises:
+        HTTPException: 404 if the product or a referenced warehouse
+            does not exist, or 409 if an OUT or TRANSFER movement would
+            reduce a stock level below zero.
+    """
+    service = InventoryCommandService(db)
+    try:
+        movement = await service.record_movement(data)
+    except NotFoundError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
+        ) from exc
+    except InsufficientStockError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
+        ) from exc
+    return MovementRead.model_validate(movement)
