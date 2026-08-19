@@ -7,6 +7,7 @@ ensures type safety and fail-fast behavior on missing or invalid values.
 
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -28,6 +29,8 @@ class Settings(BaseSettings):
         access_token_expire_minutes: JWT access token expiration time in minutes.
         low_stock_alert_threshold_default: Default stock quantity threshold
             below which a low-stock alert is triggered.
+        cors_allowed_origins: Origins allowed to make cross-origin
+            requests to the API (e.g. the frontend's URL).
     """
 
     environment: str = "development"
@@ -46,12 +49,35 @@ class Settings(BaseSettings):
 
     low_stock_alert_threshold_default: int = 10
 
+    cors_allowed_origins: list[str] = ["http://localhost:3000"]
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",
     )
+
+    @field_validator("cors_allowed_origins", mode="before")
+    @classmethod
+    def split_comma_separated_origins(cls, value: str | list[str]) -> str | list[str]:
+        """Allow CORS_ALLOWED_ORIGINS to be set as a comma-separated string.
+
+        Environment variables are always strings, and a JSON list is
+        awkward to hand-write in a .env file, so a plain comma-separated
+        value (e.g. "http://localhost:3000,https://app.example.com") is
+        accepted alongside an actual list.
+
+        Args:
+            value: The raw value from the environment or a default list.
+
+        Returns:
+            str | list[str]: A list of origins, or the original value if
+            it was already a list.
+        """
+        if isinstance(value, str):
+            return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value
 
 
 @lru_cache

@@ -61,3 +61,42 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         )
         response.headers[REQUEST_ID_HEADER] = request_id
         return response
+
+
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    """Adds standard security-related headers to every response.
+
+    Covers the baseline OWASP secure-headers recommendations relevant
+    to a JSON API: this app has no HTML views, so headers aimed at
+    script/style injection (CSP) are set with a locked-down default
+    rather than omitted, and browser-specific protections (framing,
+    MIME sniffing) are enabled unconditionally. The locked-down CSP is
+    skipped for FastAPI's own docs pages, which load Swagger UI/ReDoc
+    assets from a CDN and would otherwise be blocked by it.
+    """
+
+    _DOCS_PATHS = frozenset({"/docs", "/redoc", "/openapi.json"})
+
+    async def dispatch(
+        self, request: Request, call_next: RequestResponseEndpoint
+    ) -> Response:
+        """Attach security headers to the downstream response.
+
+        Args:
+            request: The incoming request.
+            call_next: The next handler in the middleware chain.
+
+        Returns:
+            Response: The response produced downstream, with security
+            headers added.
+        """
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "no-referrer"
+        response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+        if request.url.path not in self._DOCS_PATHS:
+            response.headers["Content-Security-Policy"] = (
+                "default-src 'none'; frame-ancestors 'none'"
+            )
+        return response
