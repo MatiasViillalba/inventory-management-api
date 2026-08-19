@@ -6,14 +6,18 @@ POST route is backed by InventoryCommandService, which applies stock
 changes under row-level locking and appends an immutable Movement
 audit record. Inventory records are never created or mutated directly
 — every stock change goes through a Movement.
+
+Domain exceptions raised by the services (NotFoundError,
+InsufficientStockError) are not caught here — they propagate to the
+global handlers registered in app.core.error_handlers, which map them
+to the appropriate HTTP status code.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import InsufficientStockError, NotFoundError
 from app.core.session import get_db
 from app.schemas.inventory import InventoryRead
 from app.schemas.movement import MovementCreate, MovementRead
@@ -73,16 +77,12 @@ async def get_stock_level(
         InventoryRead: The matching inventory record.
 
     Raises:
-        HTTPException: 404 if the product has no stock record in that
-            warehouse yet.
+        NotFoundError: If the product has no stock record in that
+            warehouse yet (translated to a 404 response by the global
+            handler).
     """
     service = InventoryQueryService(db)
-    try:
-        record = await service.get_stock_level(product_id, warehouse_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+    record = await service.get_stock_level(product_id, warehouse_id)
     return InventoryRead.model_validate(record)
 
 
@@ -106,19 +106,13 @@ async def record_movement(
         MovementRead: The newly created movement record.
 
     Raises:
-        HTTPException: 404 if the product or a referenced warehouse
-            does not exist, or 409 if an OUT or TRANSFER movement would
-            reduce a stock level below zero.
+        NotFoundError: If the product or a referenced warehouse does
+            not exist (translated to a 404 response by the global
+            handler).
+        InsufficientStockError: If an OUT or TRANSFER movement would
+            reduce a stock level below zero (translated to a 409
+            response).
     """
     service = InventoryCommandService(db)
-    try:
-        movement = await service.record_movement(data)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    except InsufficientStockError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+    movement = await service.record_movement(data)
     return MovementRead.model_validate(movement)

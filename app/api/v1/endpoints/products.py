@@ -4,14 +4,18 @@ Exposes list, search, detail, create, update, and deactivate routes
 backed by ProductService. Products are never hard-deleted: the DELETE
 route performs a soft delete (is_active=False) so historical inventory
 and movement records remain valid and auditable.
+
+Domain exceptions raised by the service (NotFoundError, ConflictError)
+are not caught here — they propagate to the global handlers registered
+in app.core.error_handlers, which map them to the appropriate HTTP
+status code.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError, NotFoundError
 from app.core.session import get_db
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.services.product import ProductService
@@ -67,15 +71,11 @@ async def get_product(
         ProductRead: The matching product.
 
     Raises:
-        HTTPException: 404 if no product exists with the given id.
+        NotFoundError: If no product exists with the given id
+            (translated to a 404 response by the global handler).
     """
     service = ProductService(db)
-    try:
-        product = await service.get_product(product_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+    product = await service.get_product(product_id)
     return ProductRead.model_validate(product)
 
 
@@ -94,15 +94,11 @@ async def create_product(
         ProductRead: The newly created product.
 
     Raises:
-        HTTPException: 409 if a product with the same SKU already exists.
+        ConflictError: If a product with the same SKU already exists
+            (translated to a 409 response by the global handler).
     """
     service = ProductService(db)
-    try:
-        product = await service.create_product(data)
-    except ConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+    product = await service.create_product(data)
     return ProductRead.model_validate(product)
 
 
@@ -123,20 +119,13 @@ async def update_product(
         ProductRead: The updated product.
 
     Raises:
-        HTTPException: 404 if no product exists with the given id, or 409
-            if the update would set a SKU already used by another product.
+        NotFoundError: If no product exists with the given id
+            (translated to a 404 response by the global handler).
+        ConflictError: If the update would set a SKU already used by
+            another product (translated to a 409 response).
     """
     service = ProductService(db)
-    try:
-        product = await service.update_product(product_id, data)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    except ConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+    product = await service.update_product(product_id, data)
     return ProductRead.model_validate(product)
 
 
@@ -155,13 +144,9 @@ async def deactivate_product(
         ProductRead: The deactivated product.
 
     Raises:
-        HTTPException: 404 if no product exists with the given id.
+        NotFoundError: If no product exists with the given id
+            (translated to a 404 response by the global handler).
     """
     service = ProductService(db)
-    try:
-        product = await service.deactivate_product(product_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+    product = await service.deactivate_product(product_id)
     return ProductRead.model_validate(product)

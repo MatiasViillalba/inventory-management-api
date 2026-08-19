@@ -5,14 +5,18 @@ reaction to stock-level changes (see AlertService.evaluate_stock_level,
 invoked from the inventory write side) — clients never create an alert
 directly. This module exposes read routes over the alert history and
 the one client-triggered mutation: manually resolving an active alert.
+
+Domain exceptions raised by the service (NotFoundError, ConflictError)
+are not caught here — they propagate to the global handlers registered
+in app.core.error_handlers, which map them to the appropriate HTTP
+status code.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError, NotFoundError
 from app.core.session import get_db
 from app.repositories.alert import AlertRepository
 from app.schemas.alert import AlertRead
@@ -65,15 +69,11 @@ async def get_alert(
         AlertRead: The matching alert.
 
     Raises:
-        HTTPException: 404 if no alert exists with the given id.
+        NotFoundError: If no alert exists with the given id (translated
+            to a 404 response by the global handler).
     """
     repository = AlertRepository(db)
-    try:
-        alert = await repository.get_by_id_or_raise(alert_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+    alert = await repository.get_by_id_or_raise(alert_id)
     return AlertRead.model_validate(alert)
 
 
@@ -92,18 +92,11 @@ async def resolve_alert(
         AlertRead: The resolved alert.
 
     Raises:
-        HTTPException: 404 if no alert exists with the given id, or 409
-            if the alert is already resolved.
+        NotFoundError: If no alert exists with the given id (translated
+            to a 404 response by the global handler).
+        ConflictError: If the alert is already resolved (translated to
+            a 409 response).
     """
     service = AlertService(db)
-    try:
-        alert = await service.resolve_alert(alert_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    except ConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+    alert = await service.resolve_alert(alert_id)
     return AlertRead.model_validate(alert)

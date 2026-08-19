@@ -4,14 +4,18 @@ Exposes list, detail, create, update, and deactivate routes backed by
 WarehouseService. Warehouses are never hard-deleted: the DELETE route
 performs a soft delete (is_active=False) so historical inventory and
 movement records remain valid and auditable.
+
+Domain exceptions raised by the service (NotFoundError, ConflictError)
+are not caught here — they propagate to the global handlers registered
+in app.core.error_handlers, which map them to the appropriate HTTP
+status code.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import ConflictError, NotFoundError
 from app.core.session import get_db
 from app.schemas.warehouse import WarehouseCreate, WarehouseRead, WarehouseUpdate
 from app.services.warehouse import WarehouseService
@@ -60,15 +64,11 @@ async def get_warehouse(
         WarehouseRead: The matching warehouse.
 
     Raises:
-        HTTPException: 404 if no warehouse exists with the given id.
+        NotFoundError: If no warehouse exists with the given id
+            (translated to a 404 response by the global handler).
     """
     service = WarehouseService(db)
-    try:
-        warehouse = await service.get_warehouse(warehouse_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+    warehouse = await service.get_warehouse(warehouse_id)
     return WarehouseRead.model_validate(warehouse)
 
 
@@ -87,15 +87,11 @@ async def create_warehouse(
         WarehouseRead: The newly created warehouse.
 
     Raises:
-        HTTPException: 409 if a warehouse with the same code already exists.
+        ConflictError: If a warehouse with the same code already exists
+            (translated to a 409 response by the global handler).
     """
     service = WarehouseService(db)
-    try:
-        warehouse = await service.create_warehouse(data)
-    except ConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+    warehouse = await service.create_warehouse(data)
     return WarehouseRead.model_validate(warehouse)
 
 
@@ -116,21 +112,13 @@ async def update_warehouse(
         WarehouseRead: The updated warehouse.
 
     Raises:
-        HTTPException: 404 if no warehouse exists with the given id, or
-            409 if the update would set a code already used by another
-            warehouse.
+        NotFoundError: If no warehouse exists with the given id
+            (translated to a 404 response by the global handler).
+        ConflictError: If the update would set a code already used by
+            another warehouse (translated to a 409 response).
     """
     service = WarehouseService(db)
-    try:
-        warehouse = await service.update_warehouse(warehouse_id, data)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
-    except ConflictError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT, detail=str(exc)
-        ) from exc
+    warehouse = await service.update_warehouse(warehouse_id, data)
     return WarehouseRead.model_validate(warehouse)
 
 
@@ -149,13 +137,9 @@ async def deactivate_warehouse(
         WarehouseRead: The deactivated warehouse.
 
     Raises:
-        HTTPException: 404 if no warehouse exists with the given id.
+        NotFoundError: If no warehouse exists with the given id
+            (translated to a 404 response by the global handler).
     """
     service = WarehouseService(db)
-    try:
-        warehouse = await service.deactivate_warehouse(warehouse_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+    warehouse = await service.deactivate_warehouse(warehouse_id)
     return WarehouseRead.model_validate(warehouse)

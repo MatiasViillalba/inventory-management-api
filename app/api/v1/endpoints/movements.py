@@ -5,14 +5,17 @@ InventoryCommandService (see POST /inventory) — this module exposes no
 write routes. Queries are simple pass-throughs with no business logic
 beyond filtering and pagination, so they go straight through
 MovementRepository rather than a dedicated service layer.
+
+The NotFoundError raised by get_by_id_or_raise is not caught here —
+it propagates to the global handler registered in
+app.core.error_handlers, which maps it to a 404 response.
 """
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import NotFoundError
 from app.core.session import get_db
 from app.repositories.movement import MovementRepository
 from app.schemas.movement import MovementRead
@@ -68,13 +71,9 @@ async def get_movement(
         MovementRead: The matching movement.
 
     Raises:
-        HTTPException: 404 if no movement exists with the given id.
+        NotFoundError: If no movement exists with the given id
+            (translated to a 404 response by the global handler).
     """
     repository = MovementRepository(db)
-    try:
-        movement = await repository.get_by_id_or_raise(movement_id)
-    except NotFoundError as exc:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, detail=str(exc)
-        ) from exc
+    movement = await repository.get_by_id_or_raise(movement_id)
     return MovementRead.model_validate(movement)
