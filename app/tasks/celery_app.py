@@ -9,6 +9,7 @@ import it without booting the web server, and vice versa.
 from celery import Celery
 from celery.schedules import crontab
 
+import app.tasks.monitoring  # noqa: F401 -- imported for its signal-handler registration
 from app.core.config import get_settings
 from app.events.publisher import get_event_publisher
 from app.websockets.listeners import register_websocket_listeners
