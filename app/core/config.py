@@ -31,6 +31,13 @@ class Settings(BaseSettings):
             below which a low-stock alert is triggered.
         cors_allowed_origins: Origins allowed to make cross-origin
             requests to the API (e.g. the frontend's URL).
+        smtp_host: Hostname of the SMTP server used to send notification
+            emails.
+        smtp_port: Port of the SMTP server.
+        smtp_user: Username for SMTP authentication, if required.
+        smtp_password: Password for SMTP authentication, if required.
+        smtp_use_tls: Whether to upgrade the SMTP connection with STARTTLS.
+        smtp_from_email: The address notification emails are sent from.
     """
 
     environment: str = "development"
@@ -50,6 +57,13 @@ class Settings(BaseSettings):
     low_stock_alert_threshold_default: int = 10
 
     cors_allowed_origins: list[str] = ["http://localhost:3000"]
+
+    smtp_host: str = "localhost"
+    smtp_port: int = 1025
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_use_tls: bool = False
+    smtp_from_email: str = "alerts@inventory-management-api.local"
 
     model_config = SettingsConfigDict(
         env_file=".env",

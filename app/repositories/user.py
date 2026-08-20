@@ -39,3 +39,19 @@ class UserRepository(BaseRepository[User]):
         statement = select(User).where(User.email == email)
         result = await self.session.execute(statement)
         return result.scalar_one_or_none()
+
+    async def list_active_superusers(self) -> list[User]:
+        """List active superuser accounts.
+
+        Used to determine who receives operational notifications, such
+        as low-stock alert emails, since the domain has no separate
+        notification-recipient concept yet.
+
+        Returns:
+            A list of active users with superuser privileges.
+        """
+        statement = select(User).where(
+            User.is_superuser.is_(True), User.is_active.is_(True)
+        )
+        result = await self.session.execute(statement)
+        return list(result.scalars().all())

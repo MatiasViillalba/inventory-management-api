@@ -4,8 +4,13 @@ AlertService keeps Alert records in sync with current stock levels. It
 is invoked by the write side of inventory operations after a stock
 mutation commits, rather than by API endpoints directly — alerts are a
 reaction to inventory state, not a resource clients create by hand.
+
+Newly created or escalated alerts also enqueue an email notification
+task rather than sending it inline, so a slow or unavailable SMTP
+server never delays the inventory mutation that triggered the alert.
 """
 
+import logging
 import uuid
 from datetime import datetime, timezone
 
@@ -16,6 +21,9 @@ from app.core.exceptions import ConflictError
 from app.models.alert import Alert, AlertStatus, AlertType
 from app.models.inventory import Inventory
 from app.repositories.alert import AlertRepository
+from app.tasks.notifications import send_low_stock_alert_email
+
+logger = logging.getLogger(__name__)
 
 
 class AlertService:
@@ -78,6 +86,7 @@ class AlertService:
                 existing.quantity_at_trigger = inventory.quantity
                 await self.session.commit()
                 await self.session.refresh(existing)
+                self._enqueue_notification(existing)
             return existing
 
         alert = Alert(
@@ -89,6 +98,7 @@ class AlertService:
         )
         alert = await self.repository.create(alert)
         await self.session.commit()
+        self._enqueue_notification(alert)
         return alert
 
     async def resolve_alert(self, alert_id: uuid.UUID) -> Alert:
@@ -121,6 +131,27 @@ class AlertService:
             A list of active alerts.
         """
         return await self.repository.list_active(skip=skip, limit=limit)
+
+    def _enqueue_notification(self, alert: Alert) -> None:
+        """Enqueue the low-stock email task without failing the caller.
+
+        The alert row is already committed by this point, so a broker
+        outage here must not surface as a failure of the inventory
+        mutation that triggered it — it is logged and swallowed
+        instead. The periodic sweep task (check_low_stock_levels) acts
+        as a safety net that will re-evaluate this alert on its next
+        run regardless.
+
+        Args:
+            alert: The newly created or escalated alert to notify about.
+        """
+        try:
+            send_low_stock_alert_email.delay(str(alert.id))
+        except Exception:
+            logger.exception(
+                "Failed to enqueue low-stock email notification for alert %s.",
+                alert.id,
+            )
 
     async def _resolve(self, alert: Alert) -> None:
         """Mark an alert resolved and stamp the resolution time.
