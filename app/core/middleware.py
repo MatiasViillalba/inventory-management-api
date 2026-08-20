@@ -58,6 +58,13 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             response.status_code,
             duration_ms,
             request_id,
+            extra={
+                "request_id": request_id,
+                "http_method": request.method,
+                "http_path": request.url.path,
+                "http_status_code": response.status_code,
+                "duration_ms": round(duration_ms, 1),
+            },
         )
         response.headers[REQUEST_ID_HEADER] = request_id
         return response

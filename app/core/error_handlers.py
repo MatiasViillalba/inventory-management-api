@@ -63,8 +63,16 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     Returns:
         JSONResponse: A generic 500 error body.
     """
+    request_id = getattr(request.state, "request_id", None)
     logger.exception(
-        "Unhandled exception while processing %s %s", request.method, request.url.path
+        "Unhandled exception while processing %s %s",
+        request.method,
+        request.url.path,
+        extra={
+            "request_id": request_id,
+            "http_method": request.method,
+            "http_path": request.url.path,
+        },
     )
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
