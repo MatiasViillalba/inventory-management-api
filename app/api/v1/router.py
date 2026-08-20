@@ -15,6 +15,7 @@ from app.api.v1.endpoints import (
     products,
     reports,
     warehouses,
+    websockets,
 )
 
 api_router = APIRouter()
@@ -25,3 +26,4 @@ api_router.include_router(inventory.router)
 api_router.include_router(movements.router)
 api_router.include_router(alerts.router)
 api_router.include_router(reports.router)
+api_router.include_router(websockets.router)
