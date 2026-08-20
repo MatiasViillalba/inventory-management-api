@@ -17,7 +17,7 @@ import uuid
 from pathlib import Path
 
 from app.core.config import get_settings
-from app.core.session import AsyncSessionLocal
+from app.core.session import TaskSessionLocal
 from app.schemas.report import InventorySummaryReport, InventoryValuationReport
 from app.services.report import ReportService
 from app.tasks.celery_app import celery_app
@@ -64,7 +64,7 @@ async def _generate_report_csv(kind: ReportKind) -> dict[str, str]:
     Returns:
         dict[str, str]: The report kind and the generated file's path.
     """
-    async with AsyncSessionLocal() as session:
+    async with TaskSessionLocal() as session:
         service = ReportService(session)
         if kind == ReportKind.INVENTORY_SUMMARY:
             file_path = _write_inventory_summary_csv(

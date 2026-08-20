@@ -12,7 +12,7 @@ import logging
 import uuid
 
 from app.core.email import send_email
-from app.core.session import AsyncSessionLocal
+from app.core.session import TaskSessionLocal
 from app.models.alert import Alert, AlertType
 from app.repositories.alert import AlertRepository
 from app.repositories.product import ProductRepository
@@ -51,7 +51,7 @@ async def _send_low_stock_alert_email(alert_id: uuid.UUID) -> None:
     Args:
         alert_id: The Alert's UUID.
     """
-    async with AsyncSessionLocal() as session:
+    async with TaskSessionLocal() as session:
         alert = await AlertRepository(session).get_by_id_or_raise(alert_id)
         product = await ProductRepository(session).get_by_id_or_raise(alert.product_id)
         warehouse = await WarehouseRepository(session).get_by_id_or_raise(alert.warehouse_id)

@@ -12,7 +12,7 @@ threshold edit, or a missed event.
 import asyncio
 import logging
 
-from app.core.session import AsyncSessionLocal
+from app.core.session import TaskSessionLocal
 from app.events.publisher import get_event_publisher
 from app.repositories.inventory import InventoryRepository
 from app.services.alert import AlertService
@@ -53,7 +53,7 @@ async def _check_low_stock_levels() -> dict[str, int]:
     evaluated = 0
     alerts_active = 0
 
-    async with AsyncSessionLocal() as session:
+    async with TaskSessionLocal() as session:
         repository = InventoryRepository(session)
         alert_service = AlertService(session, get_event_publisher())
 

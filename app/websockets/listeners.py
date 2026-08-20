@@ -3,17 +3,20 @@
 Subscribes to the same in-process EventPublisher the domain services
 publish to (see app/services/inventory_command.py and
 app/services/alert.py) and forwards every inventory event to
-ConnectionManager.broadcast, so a connected WebSocket client learns
-about a stock change or alert the instant it happens instead of
-polling the REST endpoints. register_websocket_listeners is called
+RedisBroadcaster.publish, so a connected WebSocket client learns about
+a stock change or alert the instant it happens instead of polling the
+REST endpoints. Publishing goes through Redis pub/sub rather than
+straight to the local ConnectionManager so the broadcast reaches
+WebSocket clients connected to *any* API process, not just this one
+(see app/websockets/pubsub.py). register_websocket_listeners is called
 once at application startup (see app/main.py).
 
-Each event is additionally broadcast to the warehouse-scoped
-channel(s) it's relevant to (one channel for most event types, two for
-a transfer, which touches a source and a destination warehouse at
-once), on top of the always-included global channel. Clients that only
-care about one warehouse can subscribe to that warehouse's channel
-(see app/api/v1/endpoints/websockets.py's `channel` query parameter)
+Each event is additionally scoped to the warehouse channel(s) it's
+relevant to (one channel for most event types, two for a transfer,
+which touches a source and a destination warehouse at once), on top of
+the always-included global channel. Clients that only care about one
+warehouse can subscribe to that warehouse's channel (see
+app/api/v1/endpoints/websockets.py's `channel` query parameter)
 instead of receiving every event in the system.
 """
 
@@ -31,7 +34,7 @@ from app.events.inventory import (
     StockRemovedEvent,
     StockTransferredEvent,
 )
-from app.websockets.manager import ConnectionManager
+from app.websockets.pubsub import RedisBroadcaster
 
 logger = logging.getLogger(__name__)
 
@@ -49,14 +52,14 @@ _BROADCAST_EVENT_TYPES = {
 
 
 def register_websocket_listeners(
-    event_publisher: EventPublisher, connection_manager: ConnectionManager
+    event_publisher: EventPublisher, broadcaster: RedisBroadcaster
 ) -> None:
     """Subscribe every inventory domain event to a WebSocket broadcast.
 
     Args:
         event_publisher: The publisher domain services publish to.
-        connection_manager: The manager used to fan messages out to
-            connected WebSocket clients.
+        broadcaster: Publishes the resulting message over Redis pub/sub
+            for every process to relay to its own WebSocket clients.
     """
 
     async def broadcast_event(event: DomainEvent) -> None:
@@ -65,7 +68,7 @@ def register_websocket_listeners(
         Args:
             event: The published event.
         """
-        await connection_manager.broadcast(_serialize_event(event), _channels_for(event))
+        await broadcaster.publish(_serialize_event(event), _channels_for(event))
 
     for event_type in _BROADCAST_EVENT_TYPES.values():
         event_publisher.subscribe(event_type, broadcast_event)

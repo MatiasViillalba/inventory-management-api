@@ -10,6 +10,9 @@ from celery import Celery
 from celery.schedules import crontab
 
 from app.core.config import get_settings
+from app.events.publisher import get_event_publisher
+from app.websockets.listeners import register_websocket_listeners
+from app.websockets.pubsub import get_redis_broadcaster
 
 settings = get_settings()
 
@@ -58,3 +61,14 @@ celery_app.conf.beat_schedule = {
         "schedule": crontab(minute="*/15"),
     },
 }
+
+# Alerts raised by the periodic sweep task (AlertService, run inside
+# check_low_stock_levels) publish domain events exactly like the
+# request-driven path does. Subscribing here too means those alerts
+# also reach connected WebSocket clients via Redis pub/sub, not just
+# alerts raised from an API request. Safe to call at import time: it
+# only registers in-process subscriptions and constructs a
+# RedisBroadcaster, neither of which opens a network connection until
+# a task actually publishes something (see RedisBroadcaster.publish's
+# docstring for why it never reuses a connection across task runs).
+register_websocket_listeners(get_event_publisher(), get_redis_broadcaster())
