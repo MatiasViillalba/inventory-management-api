@@ -16,6 +16,12 @@ celery_app = Celery(
     "inventory_management_api",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
+    # Task modules are listed explicitly rather than via
+    # autodiscover_tasks, since that helper looks for a `tasks.py`
+    # submodule inside each package and would miss the flat,
+    # single-purpose modules used here (alerts.py, notifications.py,
+    # reports.py). Extended in later commits as new task modules land.
+    include=["app.tasks.alerts"],
 )
 
 celery_app.conf.update(
@@ -38,5 +44,3 @@ celery_app.conf.update(
     # --- Result backend ---
     result_expires=3600,
 )
-
-celery_app.autodiscover_tasks(["app.tasks"])
