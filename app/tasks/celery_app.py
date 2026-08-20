@@ -7,6 +7,7 @@ import it without booting the web server, and vice versa.
 """
 
 from celery import Celery
+from celery.schedules import crontab
 
 from app.core.config import get_settings
 
@@ -44,3 +45,16 @@ celery_app.conf.update(
     # --- Result backend ---
     result_expires=3600,
 )
+
+# --- Periodic tasks (Celery Beat) ---
+# Requires a separate `celery -A app.tasks.celery_app beat` process to
+# tick the schedule; the worker process alone does not run these.
+# check_low_stock_levels is a reconciliation sweep (see
+# app/tasks/alerts.py), so it is scheduled to run independently of any
+# stock mutation, catching drift the event-driven path would miss.
+celery_app.conf.beat_schedule = {
+    "check-low-stock-levels": {
+        "task": "app.tasks.alerts.check_low_stock_levels",
+        "schedule": crontab(minute="*/15"),
+    },
+}
