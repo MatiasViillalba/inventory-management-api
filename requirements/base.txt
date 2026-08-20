@@ -22,6 +22,7 @@ python-multipart==0.0.9
 # --- Async Tasks & Caching ---
 celery==5.4.0
 redis==5.0.8
+apscheduler==3.10.4
 
 # --- WebSockets ---
 websockets==13.1

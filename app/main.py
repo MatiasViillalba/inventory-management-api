@@ -20,6 +20,7 @@ from app.core.config import get_settings
 from app.core.error_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
+from app.core.scheduler import start_scheduler, stop_scheduler
 from app.events.publisher import get_event_publisher
 from app.websockets.listeners import register_websocket_listeners
 from app.websockets.manager import get_connection_manager
@@ -50,9 +51,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     relay_task = asyncio.create_task(
         relay_to_local_clients(get_redis_broadcaster(), get_connection_manager())
     )
+    start_scheduler()
     try:
         yield
     finally:
+        stop_scheduler()
         relay_task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await relay_task
