@@ -6,6 +6,12 @@ and appends the resulting audit trail. The read half, which only
 queries current stock levels and never mutates them, lives in
 InventoryQueryService (app/services/inventory_query.py) — see that
 module's docstring for the rationale behind the split.
+
+After a movement commits, this service also reconciles alert state for
+every inventory row it touched (via AlertService) and publishes a
+domain event describing the movement, so the WebSocket broadcast
+listener and any other subscriber learn about stock changes as they
+happen rather than by polling.
 """
 
 import uuid
@@ -13,6 +19,12 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import InsufficientStockError, NotFoundError
+from app.events.base import EventPublisher
+from app.events.inventory import (
+    StockReceivedEvent,
+    StockRemovedEvent,
+    StockTransferredEvent,
+)
 from app.models.inventory import Inventory
 from app.models.movement import Movement, MovementType
 from app.repositories.inventory import InventoryRepository
@@ -20,6 +32,7 @@ from app.repositories.movement import MovementRepository
 from app.repositories.product import ProductRepository
 from app.repositories.warehouse import WarehouseRepository
 from app.schemas.movement import MovementCreate
+from app.services.alert import AlertService
 
 
 class InventoryCommandService:
@@ -39,20 +52,27 @@ class InventoryCommandService:
             to validate that a movement's product exists.
         warehouse_repository: Data-access layer for Warehouse entities,
             used to validate that a movement's warehouse(s) exist.
+        event_publisher: Publisher used to announce completed movements.
+        alert_service: Reconciles alert state for inventory rows this
+            service mutates, sharing the same session and publisher.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize the service with a database session.
+    def __init__(self, session: AsyncSession, event_publisher: EventPublisher) -> None:
+        """Initialize the service with a database session and event publisher.
 
         Args:
             session: An active AsyncSession, typically injected via the
                 FastAPI dependency chain.
+            event_publisher: Publisher used to announce completed
+                movements and, via AlertService, alert changes.
         """
         self.session = session
+        self.event_publisher = event_publisher
         self.inventory_repository = InventoryRepository(session)
         self.movement_repository = MovementRepository(session)
         self.product_repository = ProductRepository(session)
         self.warehouse_repository = WarehouseRepository(session)
+        self.alert_service = AlertService(session, event_publisher)
 
     async def record_movement(
         self, data: MovementCreate, performed_by: uuid.UUID | None = None
@@ -77,21 +97,25 @@ class InventoryCommandService:
         """
         await self.product_repository.get_by_id_or_raise(data.product_id)
 
+        affected: list[Inventory]
         if data.movement_type == MovementType.IN:
-            await self._increase_stock(
+            inventory = await self._increase_stock(
                 data.product_id, data.destination_warehouse_id, data.quantity
             )
+            affected = [inventory]
         elif data.movement_type == MovementType.OUT:
-            await self._decrease_stock(
+            inventory = await self._decrease_stock(
                 data.product_id, data.source_warehouse_id, data.quantity
             )
+            affected = [inventory]
         else:
-            await self._transfer_stock(
+            source_inventory, destination_inventory = await self._transfer_stock(
                 data.product_id,
                 data.source_warehouse_id,
                 data.destination_warehouse_id,
                 data.quantity,
             )
+            affected = [source_inventory, destination_inventory]
 
         movement = Movement(
             product_id=data.product_id,
@@ -104,7 +128,48 @@ class InventoryCommandService:
         )
         movement = await self.movement_repository.create(movement)
         await self.session.commit()
+
+        for inventory in affected:
+            await self.alert_service.evaluate_stock_level(inventory)
+        await self.event_publisher.publish(self._build_movement_event(data, affected))
+
         return movement
+
+    def _build_movement_event(
+        self, data: MovementCreate, affected: list[Inventory]
+    ) -> StockReceivedEvent | StockRemovedEvent | StockTransferredEvent:
+        """Build the domain event describing a completed movement.
+
+        Args:
+            data: The validated movement payload that was applied.
+            affected: The Inventory row(s) mutated by the movement, in
+                the order they were affected (single row for IN/OUT,
+                [source, destination] for TRANSFER).
+
+        Returns:
+            The event matching this movement's type, carrying the
+            post-mutation quantity where applicable.
+        """
+        if data.movement_type == MovementType.IN:
+            return StockReceivedEvent(
+                product_id=data.product_id,
+                warehouse_id=data.destination_warehouse_id,
+                quantity=data.quantity,
+                resulting_quantity=affected[0].quantity,
+            )
+        if data.movement_type == MovementType.OUT:
+            return StockRemovedEvent(
+                product_id=data.product_id,
+                warehouse_id=data.source_warehouse_id,
+                quantity=data.quantity,
+                resulting_quantity=affected[0].quantity,
+            )
+        return StockTransferredEvent(
+            product_id=data.product_id,
+            source_warehouse_id=data.source_warehouse_id,
+            destination_warehouse_id=data.destination_warehouse_id,
+            quantity=data.quantity,
+        )
 
     async def _transfer_stock(
         self,
@@ -112,7 +177,7 @@ class InventoryCommandService:
         source_warehouse_id: uuid.UUID,
         destination_warehouse_id: uuid.UUID,
         quantity: int,
-    ) -> None:
+    ) -> tuple[Inventory, Inventory]:
         """Move stock between two warehouses as a single locked operation.
 
         The two legs are always applied in a fixed order — by comparing
@@ -127,6 +192,10 @@ class InventoryCommandService:
             destination_warehouse_id: Warehouse stock is added to.
             quantity: The amount to move. Always positive.
 
+        Returns:
+            A (source_inventory, destination_inventory) tuple of the
+            two updated Inventory records.
+
         Raises:
             NotFoundError: If either warehouse, or the source's stock
                 record for this product, does not exist.
@@ -137,11 +206,20 @@ class InventoryCommandService:
             (source_warehouse_id, destination_warehouse_id), key=str
         )
         if first_id == source_warehouse_id:
-            await self._decrease_stock(product_id, source_warehouse_id, quantity)
-            await self._increase_stock(product_id, destination_warehouse_id, quantity)
+            source_inventory = await self._decrease_stock(
+                product_id, source_warehouse_id, quantity
+            )
+            destination_inventory = await self._increase_stock(
+                product_id, destination_warehouse_id, quantity
+            )
         else:
-            await self._increase_stock(product_id, destination_warehouse_id, quantity)
-            await self._decrease_stock(product_id, source_warehouse_id, quantity)
+            destination_inventory = await self._increase_stock(
+                product_id, destination_warehouse_id, quantity
+            )
+            source_inventory = await self._decrease_stock(
+                product_id, source_warehouse_id, quantity
+            )
+        return source_inventory, destination_inventory
 
     async def _increase_stock(
         self, product_id: uuid.UUID, warehouse_id: uuid.UUID, quantity: int

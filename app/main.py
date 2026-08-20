@@ -15,9 +15,13 @@ from app.core.config import get_settings
 from app.core.error_handlers import register_exception_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestLoggingMiddleware, SecurityHeadersMiddleware
+from app.events.publisher import get_event_publisher
+from app.websockets.listeners import register_websocket_listeners
+from app.websockets.manager import get_connection_manager
 
 settings = get_settings()
 configure_logging()
+register_websocket_listeners(get_event_publisher(), get_connection_manager())
 
 app = FastAPI(
     title=settings.project_name,

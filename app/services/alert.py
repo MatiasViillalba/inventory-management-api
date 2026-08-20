@@ -18,6 +18,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.exceptions import ConflictError
+from app.events.base import EventPublisher
+from app.events.inventory import LowStockDetectedEvent, OutOfStockDetectedEvent
 from app.models.alert import Alert, AlertStatus, AlertType
 from app.models.inventory import Inventory
 from app.repositories.alert import AlertRepository
@@ -32,17 +34,22 @@ class AlertService:
     Attributes:
         session: The active async database session.
         repository: The data-access layer for Alert entities.
+        event_publisher: Publisher used to announce newly created or
+            escalated alerts to other parts of the system (e.g. the
+            WebSocket broadcast listener).
     """
 
-    def __init__(self, session: AsyncSession) -> None:
-        """Initialize the service with a database session.
+    def __init__(self, session: AsyncSession, event_publisher: EventPublisher) -> None:
+        """Initialize the service with a database session and event publisher.
 
         Args:
             session: An active AsyncSession, typically injected via the
                 FastAPI dependency chain.
+            event_publisher: Publisher used to announce alert changes.
         """
         self.session = session
         self.repository = AlertRepository(session)
+        self.event_publisher = event_publisher
 
     async def evaluate_stock_level(self, inventory: Inventory) -> Alert | None:
         """Reconcile alert state with a product's current stock level.
@@ -86,7 +93,7 @@ class AlertService:
                 existing.quantity_at_trigger = inventory.quantity
                 await self.session.commit()
                 await self.session.refresh(existing)
-                self._enqueue_notification(existing)
+                await self._react_to_alert(existing)
             return existing
 
         alert = Alert(
@@ -98,7 +105,7 @@ class AlertService:
         )
         alert = await self.repository.create(alert)
         await self.session.commit()
-        self._enqueue_notification(alert)
+        await self._react_to_alert(alert)
         return alert
 
     async def resolve_alert(self, alert_id: uuid.UUID) -> Alert:
@@ -131,6 +138,27 @@ class AlertService:
             A list of active alerts.
         """
         return await self.repository.list_active(skip=skip, limit=limit)
+
+    async def _react_to_alert(self, alert: Alert) -> None:
+        """Publish a domain event and enqueue an email for a new/escalated alert.
+
+        Args:
+            alert: The newly created or escalated alert to react to.
+        """
+        event = (
+            OutOfStockDetectedEvent(
+                product_id=alert.product_id, warehouse_id=alert.warehouse_id
+            )
+            if alert.alert_type == AlertType.OUT_OF_STOCK
+            else LowStockDetectedEvent(
+                product_id=alert.product_id,
+                warehouse_id=alert.warehouse_id,
+                quantity=alert.quantity_at_trigger,
+                threshold=alert.threshold,
+            )
+        )
+        await self.event_publisher.publish(event)
+        self._enqueue_notification(alert)
 
     def _enqueue_notification(self, alert: Alert) -> None:
         """Enqueue the low-stock email task without failing the caller.

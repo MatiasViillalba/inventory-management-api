@@ -13,6 +13,7 @@ import asyncio
 import logging
 
 from app.core.session import AsyncSessionLocal
+from app.events.publisher import get_event_publisher
 from app.repositories.inventory import InventoryRepository
 from app.services.alert import AlertService
 from app.tasks.celery_app import celery_app
@@ -54,7 +55,7 @@ async def _check_low_stock_levels() -> dict[str, int]:
 
     async with AsyncSessionLocal() as session:
         repository = InventoryRepository(session)
-        alert_service = AlertService(session)
+        alert_service = AlertService(session, get_event_publisher())
 
         skip = 0
         while True:

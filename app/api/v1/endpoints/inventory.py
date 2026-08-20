@@ -18,7 +18,9 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_event_publisher
 from app.core.session import get_db
+from app.events.base import EventPublisher
 from app.schemas.inventory import InventoryRead
 from app.schemas.movement import MovementCreate, MovementRead
 from app.services.inventory_command import InventoryCommandService
@@ -90,17 +92,21 @@ async def get_stock_level(
 async def record_movement(
     data: MovementCreate,
     db: AsyncSession = Depends(get_db),
+    event_publisher: EventPublisher = Depends(get_event_publisher),
 ) -> MovementRead:
     """Apply a stock movement (add, remove, or transfer) and record it.
 
     Which warehouse fields are required depends on movement_type — see
     MovementCreate for the exact rules. The affected inventory row(s)
     are locked for the duration of the operation, and an immutable
-    Movement record is appended as the audit trail.
+    Movement record is appended as the audit trail. Once committed,
+    alert state is reconciled and a domain event is published,
+    reaching any subscribed WebSocket clients.
 
     Args:
         data: Validated movement payload (IN, OUT, or TRANSFER).
         db: Injected async database session.
+        event_publisher: Injected domain event publisher.
 
     Returns:
         MovementRead: The newly created movement record.
@@ -113,6 +119,6 @@ async def record_movement(
             reduce a stock level below zero (translated to a 409
             response).
     """
-    service = InventoryCommandService(db)
+    service = InventoryCommandService(db, event_publisher)
     movement = await service.record_movement(data)
     return MovementRead.model_validate(movement)

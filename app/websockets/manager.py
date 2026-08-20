@@ -5,10 +5,11 @@ broadcast helpers. Connections are grouped by an optional channel name
 (e.g. a warehouse id) so a client only interested in one warehouse's
 activity isn't sent updates about every other one; a client that
 subscribes to GLOBAL_CHANNEL instead receives every broadcast
-regardless of channel. Route handlers that accept incoming
-connections, and the domain-event listener that feeds broadcasts from
-inventory activity, are wired up in later commits — this module only
-owns connection bookkeeping and message fan-out.
+regardless of channel. The WebSocket route that accepts connections
+lives in app/api/v1/endpoints/websockets.py; the domain-event listener
+that feeds broadcasts from inventory activity lives in
+app/websockets/listeners.py. This module only owns connection
+bookkeeping and message fan-out.
 """
 
 import logging
@@ -73,21 +74,35 @@ class ConnectionManager:
         if not connections:
             del self._connections[channel]
 
-    async def broadcast(self, message: dict[str, Any], channel: str = GLOBAL_CHANNEL) -> None:
-        """Send a JSON message to a channel's subscribers and the global ones.
+    async def broadcast(
+        self, message: dict[str, Any], channels: str | set[str] = GLOBAL_CHANNEL
+    ) -> None:
+        """Send a JSON message to one or more channels' subscribers.
+
+        Global subscribers always receive the message exactly once,
+        regardless of how many channels are given — the target set is
+        computed as a union up front, rather than sending once per
+        channel, precisely to avoid double-delivering to a client
+        subscribed to GLOBAL_CHANNEL when an event (e.g. a transfer
+        between two warehouses) is relevant to more than one channel.
 
         A connection that fails to receive the message (e.g. because
         it disconnected without a clean close handshake) is dropped
-        from every channel rather than left to error again on the next
-        broadcast.
+        from every channel it could plausibly be part of, rather than
+        left to error again on the next broadcast.
 
         Args:
             message: A JSON-serializable payload to send.
-            channel: The channel to broadcast to.
+            channels: A single channel name or a set of channel names
+                to broadcast to.
         """
-        targets = set(self._connections.get(channel, set()))
-        if channel != GLOBAL_CHANNEL:
-            targets |= self._connections.get(GLOBAL_CHANNEL, set())
+        if isinstance(channels, str):
+            channels = {channels}
+        channels = channels | {GLOBAL_CHANNEL}
+
+        targets: set[WebSocket] = set()
+        for channel in channels:
+            targets |= self._connections.get(channel, set())
 
         stale: list[WebSocket] = []
         for connection in targets:
@@ -97,8 +112,8 @@ class ConnectionManager:
                 stale.append(connection)
 
         for connection in stale:
-            self.disconnect(connection, channel)
-            self.disconnect(connection, GLOBAL_CHANNEL)
+            for channel in channels:
+                self.disconnect(connection, channel)
 
 
 _connection_manager = ConnectionManager()

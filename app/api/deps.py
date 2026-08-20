@@ -1,11 +1,12 @@
 """Reusable FastAPI dependencies for database access and authentication.
 
 Centralizes the dependency-injection surface consumed by API endpoint
-modules in one place. get_db and get_redis are re-exported here from
-app.core.session and app.core.cache so route modules have a single
-import source; the get_current_* dependencies build the
-authentication/authorization layer on top of get_db, decoding the
-caller's JWT and loading the corresponding User.
+modules in one place. get_db, get_redis, and get_event_publisher are
+re-exported here from app.core.session, app.core.cache, and
+app.events.publisher so route modules have a single import source; the
+get_current_* dependencies build the authentication/authorization
+layer on top of get_db, decoding the caller's JWT and loading the
+corresponding User.
 
 These dependencies are not yet wired into any route — endpoints adopt
 them by adding e.g. `current_user: User = Depends(get_current_user)`
@@ -24,12 +25,14 @@ from app.core.config import get_settings
 from app.core.exceptions import NotFoundError
 from app.core.security import decode_access_token
 from app.core.session import get_db
+from app.events.publisher import get_event_publisher
 from app.models.user import User
 from app.repositories.user import UserRepository
 
 __all__ = [
     "get_db",
     "get_redis",
+    "get_event_publisher",
     "get_current_user",
     "get_current_active_user",
     "get_current_superuser",

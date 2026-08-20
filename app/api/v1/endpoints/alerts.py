@@ -17,7 +17,9 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_event_publisher
 from app.core.session import get_db
+from app.events.base import EventPublisher
 from app.repositories.alert import AlertRepository
 from app.schemas.alert import AlertRead
 from app.services.alert import AlertService
@@ -31,6 +33,7 @@ async def list_alerts(
     limit: int = 100,
     active_only: bool = True,
     db: AsyncSession = Depends(get_db),
+    event_publisher: EventPublisher = Depends(get_event_publisher),
 ) -> list[AlertRead]:
     """List alerts, defaulting to only currently active ones.
 
@@ -41,12 +44,13 @@ async def list_alerts(
             status are returned. Set to False to include resolved
             alerts as well, for historical review.
         db: Injected async database session.
+        event_publisher: Injected domain event publisher.
 
     Returns:
         list[AlertRead]: The matching alerts.
     """
     if active_only:
-        service = AlertService(db)
+        service = AlertService(db, event_publisher)
         alerts = await service.list_active_alerts(skip=skip, limit=limit)
     else:
         repository = AlertRepository(db)
@@ -81,12 +85,14 @@ async def get_alert(
 async def resolve_alert(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
+    event_publisher: EventPublisher = Depends(get_event_publisher),
 ) -> AlertRead:
     """Manually resolve an active alert.
 
     Args:
         alert_id: The alert's UUID.
         db: Injected async database session.
+        event_publisher: Injected domain event publisher.
 
     Returns:
         AlertRead: The resolved alert.
@@ -97,6 +103,6 @@ async def resolve_alert(
         ConflictError: If the alert is already resolved (translated to
             a 409 response).
     """
-    service = AlertService(db)
+    service = AlertService(db, event_publisher)
     alert = await service.resolve_alert(alert_id)
     return AlertRead.model_validate(alert)
