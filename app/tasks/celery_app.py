@@ -21,7 +21,7 @@ celery_app = Celery(
     # submodule inside each package and would miss the flat,
     # single-purpose modules used here (alerts.py, notifications.py,
     # reports.py). Extended in later commits as new task modules land.
-    include=["app.tasks.alerts", "app.tasks.notifications"],
+    include=["app.tasks.alerts", "app.tasks.notifications", "app.tasks.reports"],
 )
 
 celery_app.conf.update(

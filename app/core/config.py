@@ -38,6 +38,8 @@ class Settings(BaseSettings):
         smtp_password: Password for SMTP authentication, if required.
         smtp_use_tls: Whether to upgrade the SMTP connection with STARTTLS.
         smtp_from_email: The address notification emails are sent from.
+        reports_storage_dir: Filesystem directory where generated
+            report exports (e.g. CSV files) are written.
     """
 
     environment: str = "development"
@@ -64,6 +66,8 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_use_tls: bool = False
     smtp_from_email: str = "alerts@inventory-management-api.local"
+
+    reports_storage_dir: str = "storage/reports"
 
     model_config = SettingsConfigDict(
         env_file=".env",

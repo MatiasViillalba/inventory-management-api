@@ -25,6 +25,9 @@ htmlcov/
 # --- Docker ---
 docker/*.log
 
+# --- Generated Reports ---
+storage/
+
 # --- OS ---
 .DS_Store
 Thumbs.db
