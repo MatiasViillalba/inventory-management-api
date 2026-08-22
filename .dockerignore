@@ -1,0 +1,33 @@
+# Version control
+.git
+.gitignore
+
+# Python environments and caches
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+.mypy_cache
+.ruff_cache
+.pytest_cache
+htmlcov
+.coverage
+*.egg-info
+
+# Secrets and local environment
+.env
+.env.*
+!.env.example
+
+# Tests and docs are not needed to run the app in a container
+tests
+*.md
+
+# Local-only runtime artifacts
+storage/
+
+# Editor/OS metadata
+.vscode
+.idea
+.DS_Store
