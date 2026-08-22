@@ -11,7 +11,11 @@ import logging
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
-from app.websockets.manager import GLOBAL_CHANNEL, ConnectionManager, get_connection_manager
+from app.websockets.manager import (
+    GLOBAL_CHANNEL,
+    ConnectionManager,
+    get_connection_manager,
+)
 
 logger = logging.getLogger(__name__)
 

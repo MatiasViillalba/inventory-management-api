@@ -38,7 +38,11 @@ from typing import Any
 from starlette.testclient import TestClient
 
 from app.main import app
-from app.websockets.manager import GLOBAL_CHANNEL, ConnectionManager, get_connection_manager
+from app.websockets.manager import (
+    GLOBAL_CHANNEL,
+    ConnectionManager,
+    get_connection_manager,
+)
 
 
 class _FakeWebSocket:
@@ -131,7 +135,9 @@ class TestWebSocketEndpoint:
         client = TestClient(app)
         manager = get_connection_manager()
 
-        with client.websocket_connect("/api/v1/ws?channel=endpoint-test-2") as websocket:
+        with client.websocket_connect(
+            "/api/v1/ws?channel=endpoint-test-2"
+        ) as websocket:
             asyncio.run(
                 manager.broadcast({"event_type": "stock_received"}, {"endpoint-test-2"})
             )
@@ -143,7 +149,9 @@ class TestWebSocketEndpoint:
         client = TestClient(app)
         manager = get_connection_manager()
 
-        with client.websocket_connect("/api/v1/ws?channel=endpoint-test-3") as websocket:
+        with client.websocket_connect(
+            "/api/v1/ws?channel=endpoint-test-3"
+        ) as websocket:
             asyncio.run(
                 manager.broadcast({"event_type": "irrelevant"}, {"unrelated-channel"})
             )
@@ -160,7 +168,9 @@ class TestWebSocketEndpoint:
 
         with client.websocket_connect("/api/v1/ws") as websocket:
             assert GLOBAL_CHANNEL in manager._connections
-            asyncio.run(manager.broadcast({"event_type": "global_ping"}, {GLOBAL_CHANNEL}))
+            asyncio.run(
+                manager.broadcast({"event_type": "global_ping"}, {GLOBAL_CHANNEL})
+            )
             message = websocket.receive_json()
 
         assert message == {"event_type": "global_ping"}

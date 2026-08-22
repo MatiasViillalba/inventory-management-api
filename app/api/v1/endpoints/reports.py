@@ -24,7 +24,9 @@ _REPORT_CACHE_TTL_SECONDS = 60
 
 
 @router.get("/inventory-summary", response_model=InventorySummaryReport)
-@cache_response(key_prefix="reports:inventory-summary", ttl_seconds=_REPORT_CACHE_TTL_SECONDS)
+@cache_response(
+    key_prefix="reports:inventory-summary", ttl_seconds=_REPORT_CACHE_TTL_SECONDS
+)
 async def get_inventory_summary(
     db: AsyncSession = Depends(get_db),
     redis: Redis = Depends(get_redis),

@@ -50,7 +50,9 @@ class TestBaseRepositoryCrud:
         assert fetched is not None
         assert fetched.id == created.id
 
-    async def test_get_by_id_returns_none_when_missing(self, db_session: AsyncSession) -> None:
+    async def test_get_by_id_returns_none_when_missing(
+        self, db_session: AsyncSession
+    ) -> None:
         repository = WarehouseRepository(db_session)
 
         fetched = await repository.get_by_id(uuid.uuid4())
@@ -65,10 +67,14 @@ class TestBaseRepositoryCrud:
         with pytest.raises(NotFoundError):
             await repository.get_by_id_or_raise(uuid.uuid4())
 
-    async def test_list_all_respects_skip_and_limit(self, db_session: AsyncSession) -> None:
+    async def test_list_all_respects_skip_and_limit(
+        self, db_session: AsyncSession
+    ) -> None:
         repository = WarehouseRepository(db_session)
         for index in range(3):
-            await repository.create(Warehouse(name=f"Depot {index}", code=f"BASE-LIST-{index}"))
+            await repository.create(
+                Warehouse(name=f"Depot {index}", code=f"BASE-LIST-{index}")
+            )
 
         page = await repository.list_all(skip=1, limit=1)
 
@@ -95,16 +101,22 @@ class TestWarehouseRepository:
         assert found is not None
         assert found.code == "WH-CODE-1"
 
-    async def test_get_by_code_returns_none_when_missing(self, db_session: AsyncSession) -> None:
+    async def test_get_by_code_returns_none_when_missing(
+        self, db_session: AsyncSession
+    ) -> None:
         repository = WarehouseRepository(db_session)
 
         found = await repository.get_by_code("NO-SUCH-CODE")
 
         assert found is None
 
-    async def test_list_active_excludes_inactive(self, db_session: AsyncSession) -> None:
+    async def test_list_active_excludes_inactive(
+        self, db_session: AsyncSession
+    ) -> None:
         repository = WarehouseRepository(db_session)
-        await repository.create(Warehouse(name="Active Depot", code="WH-ACTIVE", is_active=True))
+        await repository.create(
+            Warehouse(name="Active Depot", code="WH-ACTIVE", is_active=True)
+        )
         await repository.create(
             Warehouse(name="Inactive Depot", code="WH-INACTIVE", is_active=False)
         )
@@ -121,20 +133,31 @@ class TestProductRepository:
 
     async def test_get_by_sku_returns_match(self, db_session: AsyncSession) -> None:
         repository = ProductRepository(db_session)
-        await repository.create(Product(sku="SKU-REPO-1", name="Widget", price=Decimal("1.00")))
+        await repository.create(
+            Product(sku="SKU-REPO-1", name="Widget", price=Decimal("1.00"))
+        )
 
         found = await repository.get_by_sku("SKU-REPO-1")
 
         assert found is not None
         assert found.sku == "SKU-REPO-1"
 
-    async def test_list_active_excludes_inactive(self, db_session: AsyncSession) -> None:
+    async def test_list_active_excludes_inactive(
+        self, db_session: AsyncSession
+    ) -> None:
         repository = ProductRepository(db_session)
         await repository.create(
-            Product(sku="SKU-ACTIVE", name="Widget", price=Decimal("1.00"), is_active=True)
+            Product(
+                sku="SKU-ACTIVE", name="Widget", price=Decimal("1.00"), is_active=True
+            )
         )
         await repository.create(
-            Product(sku="SKU-INACTIVE", name="Gadget", price=Decimal("1.00"), is_active=False)
+            Product(
+                sku="SKU-INACTIVE",
+                name="Gadget",
+                price=Decimal("1.00"),
+                is_active=False,
+            )
         )
 
         active = await repository.list_active()
@@ -143,7 +166,9 @@ class TestProductRepository:
         assert "SKU-ACTIVE" in skus
         assert "SKU-INACTIVE" not in skus
 
-    async def test_search_by_name_is_case_insensitive(self, db_session: AsyncSession) -> None:
+    async def test_search_by_name_is_case_insensitive(
+        self, db_session: AsyncSession
+    ) -> None:
         repository = ProductRepository(db_session)
         await repository.create(
             Product(sku="SKU-SEARCH", name="Wireless Mouse", price=Decimal("1.00"))
@@ -162,10 +187,14 @@ class TestInventoryRepository:
     ) -> None:
         repository = InventoryRepository(db_session)
         await repository.create(
-            Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=15)
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=15
+            )
         )
 
-        found = await repository.get_by_product_and_warehouse(test_product.id, test_warehouse.id)
+        found = await repository.get_by_product_and_warehouse(
+            test_product.id, test_warehouse.id
+        )
 
         assert found is not None
         assert found.quantity == 15
@@ -175,7 +204,9 @@ class TestInventoryRepository:
     ) -> None:
         repository = InventoryRepository(db_session)
         await repository.create(
-            Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=15)
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=15
+            )
         )
 
         locked = await repository.get_by_product_and_warehouse_for_update(
@@ -190,7 +221,9 @@ class TestInventoryRepository:
     ) -> None:
         repository = InventoryRepository(db_session)
         await repository.create(
-            Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=5)
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=5
+            )
         )
 
         records = await repository.list_by_warehouse(test_warehouse.id)
@@ -210,7 +243,9 @@ class TestInventoryRepository:
             Product(sku="SKU-HEALTHY", name="Healthy Item", price=Decimal("1.00"))
         )
         unmonitored_product = await product_repository.create(
-            Product(sku="SKU-UNMONITORED", name="Unmonitored Item", price=Decimal("1.00"))
+            Product(
+                sku="SKU-UNMONITORED", name="Unmonitored Item", price=Decimal("1.00")
+            )
         )
 
         await inventory_repository.create(
@@ -287,7 +322,9 @@ class TestMovementRepository:
     ) -> None:
         warehouse_repository = WarehouseRepository(db_session)
         movement_repository = MovementRepository(db_session)
-        source = await warehouse_repository.create(Warehouse(name="Source", code="MOVE-SRC"))
+        source = await warehouse_repository.create(
+            Warehouse(name="Source", code="MOVE-SRC")
+        )
         destination = await warehouse_repository.create(
             Warehouse(name="Destination", code="MOVE-DST")
         )
@@ -370,7 +407,11 @@ class TestUserRepository:
     async def test_get_by_email_returns_match(self, db_session: AsyncSession) -> None:
         repository = UserRepository(db_session)
         await repository.create(
-            User(email="repo.user@example.com", hashed_password="hashed", full_name="Repo User")
+            User(
+                email="repo.user@example.com",
+                hashed_password="hashed",
+                full_name="Repo User",
+            )
         )
 
         found = await repository.get_by_email("repo.user@example.com")

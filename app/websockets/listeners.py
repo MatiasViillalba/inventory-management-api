@@ -89,7 +89,17 @@ def _channels_for(event: DomainEvent) -> set[str]:
     """
     if isinstance(event, StockTransferredEvent):
         return {str(event.source_warehouse_id), str(event.destination_warehouse_id)}
-    return {str(event.warehouse_id)}
+    if isinstance(
+        event,
+        (
+            StockReceivedEvent,
+            StockRemovedEvent,
+            LowStockDetectedEvent,
+            OutOfStockDetectedEvent,
+        ),
+    ):
+        return {str(event.warehouse_id)}
+    return set()
 
 
 def _serialize_event(event: DomainEvent) -> dict[str, Any]:

@@ -25,6 +25,8 @@ class Warehouse(BaseModel):
     __tablename__ = "warehouses"
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    code: Mapped[str] = mapped_column(String(20), unique=True, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(
+        String(20), unique=True, nullable=False, index=True
+    )
     address: Mapped[str] = mapped_column(String(500), nullable=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

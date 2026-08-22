@@ -50,7 +50,9 @@ async def list_movements(
     if product_id is not None:
         movements = await repository.list_by_product(product_id, skip=skip, limit=limit)
     elif warehouse_id is not None:
-        movements = await repository.list_by_warehouse(warehouse_id, skip=skip, limit=limit)
+        movements = await repository.list_by_warehouse(
+            warehouse_id, skip=skip, limit=limit
+        )
     else:
         movements = await repository.list_all(skip=skip, limit=limit)
     return [MovementRead.model_validate(movement) for movement in movements]

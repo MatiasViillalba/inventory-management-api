@@ -55,10 +55,16 @@ class Alert(BaseModel):
     warehouse_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("warehouses.id"), nullable=False
     )
-    alert_type: Mapped[AlertType] = mapped_column(Enum(AlertType, name="alert_type"), nullable=False)
+    alert_type: Mapped[AlertType] = mapped_column(
+        Enum(AlertType, name="alert_type"), nullable=False
+    )
     status: Mapped[AlertStatus] = mapped_column(
-        Enum(AlertStatus, name="alert_status"), default=AlertStatus.ACTIVE, nullable=False
+        Enum(AlertStatus, name="alert_status"),
+        default=AlertStatus.ACTIVE,
+        nullable=False,
     )
     threshold: Mapped[int] = mapped_column(Integer, nullable=False)
     quantity_at_trigger: Mapped[int] = mapped_column(Integer, nullable=False)
-    resolved_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=True)
+    resolved_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )

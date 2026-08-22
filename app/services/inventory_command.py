@@ -99,16 +99,23 @@ class InventoryCommandService:
 
         affected: list[Inventory]
         if data.movement_type == MovementType.IN:
+            # MovementCreate.validate_warehouses_for_type guarantees
+            # destination_warehouse_id is set for IN; the assert makes
+            # that runtime invariant visible to the type checker too.
+            assert data.destination_warehouse_id is not None
             inventory = await self._increase_stock(
                 data.product_id, data.destination_warehouse_id, data.quantity
             )
             affected = [inventory]
         elif data.movement_type == MovementType.OUT:
+            assert data.source_warehouse_id is not None
             inventory = await self._decrease_stock(
                 data.product_id, data.source_warehouse_id, data.quantity
             )
             affected = [inventory]
         else:
+            assert data.source_warehouse_id is not None
+            assert data.destination_warehouse_id is not None
             source_inventory, destination_inventory = await self._transfer_stock(
                 data.product_id,
                 data.source_warehouse_id,
@@ -151,6 +158,7 @@ class InventoryCommandService:
             post-mutation quantity where applicable.
         """
         if data.movement_type == MovementType.IN:
+            assert data.destination_warehouse_id is not None
             return StockReceivedEvent(
                 product_id=data.product_id,
                 warehouse_id=data.destination_warehouse_id,
@@ -158,12 +166,15 @@ class InventoryCommandService:
                 resulting_quantity=affected[0].quantity,
             )
         if data.movement_type == MovementType.OUT:
+            assert data.source_warehouse_id is not None
             return StockRemovedEvent(
                 product_id=data.product_id,
                 warehouse_id=data.source_warehouse_id,
                 quantity=data.quantity,
                 resulting_quantity=affected[0].quantity,
             )
+        assert data.source_warehouse_id is not None
+        assert data.destination_warehouse_id is not None
         return StockTransferredEvent(
             product_id=data.product_id,
             source_warehouse_id=data.source_warehouse_id,
@@ -239,8 +250,10 @@ class InventoryCommandService:
         """
         await self.warehouse_repository.get_by_id_or_raise(warehouse_id)
 
-        inventory = await self.inventory_repository.get_by_product_and_warehouse_for_update(
-            product_id, warehouse_id
+        inventory = (
+            await self.inventory_repository.get_by_product_and_warehouse_for_update(
+                product_id, warehouse_id
+            )
         )
         if inventory is None:
             inventory = await self.inventory_repository.create(
@@ -271,8 +284,10 @@ class InventoryCommandService:
         """
         await self.warehouse_repository.get_by_id_or_raise(warehouse_id)
 
-        inventory = await self.inventory_repository.get_by_product_and_warehouse_for_update(
-            product_id, warehouse_id
+        inventory = (
+            await self.inventory_repository.get_by_product_and_warehouse_for_update(
+                product_id, warehouse_id
+            )
         )
         if inventory is None:
             raise NotFoundError(

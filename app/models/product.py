@@ -26,7 +26,9 @@ class Product(BaseModel):
 
     __tablename__ = "products"
 
-    sku: Mapped[str] = mapped_column(String(50), unique=True, nullable=False, index=True)
+    sku: Mapped[str] = mapped_column(
+        String(50), unique=True, nullable=False, index=True
+    )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str] = mapped_column(String(2000), nullable=True)
     price: Mapped[Numeric] = mapped_column(Numeric(12, 2), nullable=False)

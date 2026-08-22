@@ -54,9 +54,12 @@ async def _send_low_stock_alert_email(alert_id: uuid.UUID) -> None:
     async with TaskSessionLocal() as session:
         alert = await AlertRepository(session).get_by_id_or_raise(alert_id)
         product = await ProductRepository(session).get_by_id_or_raise(alert.product_id)
-        warehouse = await WarehouseRepository(session).get_by_id_or_raise(alert.warehouse_id)
+        warehouse = await WarehouseRepository(session).get_by_id_or_raise(
+            alert.warehouse_id
+        )
         recipients = [
-            user.email for user in await UserRepository(session).list_active_superusers()
+            user.email
+            for user in await UserRepository(session).list_active_superusers()
         ]
 
     if not recipients:
@@ -80,7 +83,9 @@ def _build_subject(alert: Alert, *, product_name: str) -> str:
     Returns:
         A subject line indicating alert severity and the affected product.
     """
-    label = "OUT OF STOCK" if alert.alert_type == AlertType.OUT_OF_STOCK else "Low Stock"
+    label = (
+        "OUT OF STOCK" if alert.alert_type == AlertType.OUT_OF_STOCK else "Low Stock"
+    )
     return f"[Inventory Alert] {label}: {product_name}"
 
 

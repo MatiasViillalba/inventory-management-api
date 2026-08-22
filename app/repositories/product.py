@@ -53,10 +53,7 @@ class ProductRepository(BaseRepository[Product]):
             A list of active products, ordered by database default order.
         """
         statement = (
-            select(Product)
-            .where(Product.is_active.is_(True))
-            .offset(skip)
-            .limit(limit)
+            select(Product).where(Product.is_active.is_(True)).offset(skip).limit(limit)
         )
         result = await self.session.execute(statement)
         return list(result.scalars().all())

@@ -52,16 +52,25 @@ class MovementCreate(BaseModel):
         """
         if self.movement_type == MovementType.IN:
             if self.destination_warehouse_id is None:
-                raise ValueError("destination_warehouse_id is required for IN movements.")
+                raise ValueError(
+                    "destination_warehouse_id is required for IN movements."
+                )
             if self.source_warehouse_id is not None:
-                raise ValueError("source_warehouse_id must not be set for IN movements.")
+                raise ValueError(
+                    "source_warehouse_id must not be set for IN movements."
+                )
         elif self.movement_type == MovementType.OUT:
             if self.source_warehouse_id is None:
                 raise ValueError("source_warehouse_id is required for OUT movements.")
             if self.destination_warehouse_id is not None:
-                raise ValueError("destination_warehouse_id must not be set for OUT movements.")
+                raise ValueError(
+                    "destination_warehouse_id must not be set for OUT movements."
+                )
         elif self.movement_type == MovementType.TRANSFER:
-            if self.source_warehouse_id is None or self.destination_warehouse_id is None:
+            if (
+                self.source_warehouse_id is None
+                or self.destination_warehouse_id is None
+            ):
                 raise ValueError(
                     "Both source_warehouse_id and destination_warehouse_id are "
                     "required for TRANSFER movements."

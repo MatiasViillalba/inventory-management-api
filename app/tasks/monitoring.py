@@ -58,7 +58,9 @@ def _on_task_postrun(
         **_: Additional signal arguments Celery may pass, ignored.
     """
     start_time = _start_times.pop(task_id, None) if task_id is not None else None
-    duration_ms = round((time.perf_counter() - start_time) * 1000, 1) if start_time else None
+    duration_ms = (
+        round((time.perf_counter() - start_time) * 1000, 1) if start_time else None
+    )
     logger.info(
         "Task finished: %s (%s)",
         getattr(task, "name", "<unknown>"),

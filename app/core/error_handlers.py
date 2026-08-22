@@ -34,17 +34,23 @@ _STATUS_CODE_BY_EXCEPTION: dict[type[AppException], int] = {
 }
 
 
-async def app_exception_handler(request: Request, exc: AppException) -> JSONResponse:
+async def app_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Translate a domain exception into a JSON error response.
 
     Args:
         request: The incoming request that triggered the exception.
         exc: The domain exception raised by a service or repository.
+            Typed as the base Exception because that's what Starlette's
+            add_exception_handler signature requires for any registered
+            handler; register_exception_handlers only ever registers
+            this one for AppException, so the isinstance below always
+            holds in practice.
 
     Returns:
         JSONResponse: A `{"detail": ...}` body with the status code
         mapped for this exception type (400 if the type is unmapped).
     """
+    assert isinstance(exc, AppException)
     status_code = _STATUS_CODE_BY_EXCEPTION.get(type(exc), status.HTTP_400_BAD_REQUEST)
     return JSONResponse(status_code=status_code, content={"detail": exc.message})
 

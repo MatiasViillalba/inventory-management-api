@@ -110,7 +110,9 @@ async def relay_to_local_clients(
     """
     pubsub = broadcaster.redis.pubsub()
     await pubsub.subscribe(BROADCAST_CHANNEL)
-    logger.info("Subscribed to Redis channel '%s' for WebSocket fan-out.", BROADCAST_CHANNEL)
+    logger.info(
+        "Subscribed to Redis channel '%s' for WebSocket fan-out.", BROADCAST_CHANNEL
+    )
     try:
         async for raw in pubsub.listen():
             if raw["type"] != "message":

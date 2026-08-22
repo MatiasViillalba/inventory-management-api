@@ -143,13 +143,17 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
         yield db_session
 
     async def _override_get_redis() -> AsyncGenerator[Redis, None]:
-        async with Redis.from_url(settings.redis_url, decode_responses=True) as redis_client:
+        async with Redis.from_url(
+            settings.redis_url, decode_responses=True
+        ) as redis_client:
             yield redis_client
 
     app.dependency_overrides[get_db] = _override_get_db
     app.dependency_overrides[get_redis] = _override_get_redis
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://testserver") as async_client:
+    async with AsyncClient(
+        transport=transport, base_url="http://testserver"
+    ) as async_client:
         yield async_client
     app.dependency_overrides.clear()
 

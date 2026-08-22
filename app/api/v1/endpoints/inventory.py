@@ -54,7 +54,9 @@ async def list_inventory(
     """
     service = InventoryQueryService(db)
     if warehouse_id is not None:
-        records = await service.list_warehouse_stock(warehouse_id, skip=skip, limit=limit)
+        records = await service.list_warehouse_stock(
+            warehouse_id, skip=skip, limit=limit
+        )
     elif low_stock_only:
         records = await service.list_low_stock(skip=skip, limit=limit)
     else:

@@ -40,7 +40,9 @@ class ConnectionManager:
         """Initialize the manager with no active connections."""
         self._connections: dict[str, set[WebSocket]] = {}
 
-    async def connect(self, websocket: WebSocket, channel: str = GLOBAL_CHANNEL) -> None:
+    async def connect(
+        self, websocket: WebSocket, channel: str = GLOBAL_CHANNEL
+    ) -> None:
         """Accept a WebSocket handshake and register it under a channel.
 
         Args:

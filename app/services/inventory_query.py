@@ -76,7 +76,9 @@ class InventoryQueryService:
         Returns:
             A list of inventory records for the given warehouse.
         """
-        return await self.repository.list_by_warehouse(warehouse_id, skip=skip, limit=limit)
+        return await self.repository.list_by_warehouse(
+            warehouse_id, skip=skip, limit=limit
+        )
 
     async def list_low_stock(self, skip: int = 0, limit: int = 100) -> list[Inventory]:
         """List inventory records at or below their low-stock threshold.

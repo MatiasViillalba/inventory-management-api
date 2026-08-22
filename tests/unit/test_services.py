@@ -69,9 +69,13 @@ class TestWarehouseService:
         await service.create_warehouse(WarehouseCreate(name="Depot", code="SVC-WH-DUP"))
 
         with pytest.raises(ConflictError):
-            await service.create_warehouse(WarehouseCreate(name="Other Depot", code="SVC-WH-DUP"))
+            await service.create_warehouse(
+                WarehouseCreate(name="Other Depot", code="SVC-WH-DUP")
+            )
 
-    async def test_get_warehouse_raises_not_found(self, db_session: AsyncSession) -> None:
+    async def test_get_warehouse_raises_not_found(
+        self, db_session: AsyncSession
+    ) -> None:
         service = WarehouseService(db_session)
 
         with pytest.raises(NotFoundError):
@@ -81,7 +85,9 @@ class TestWarehouseService:
         self, db_session: AsyncSession
     ) -> None:
         service = WarehouseService(db_session)
-        await service.create_warehouse(WarehouseCreate(name="Active", code="SVC-WH-ACTIVE"))
+        await service.create_warehouse(
+            WarehouseCreate(name="Active", code="SVC-WH-ACTIVE")
+        )
         inactive = await service.create_warehouse(
             WarehouseCreate(name="Inactive", code="SVC-WH-INACTIVE")
         )
@@ -98,14 +104,20 @@ class TestWarehouseService:
     ) -> None:
         service = WarehouseService(db_session)
         await service.create_warehouse(WarehouseCreate(name="Depot A", code="SVC-WH-A"))
-        depot_b = await service.create_warehouse(WarehouseCreate(name="Depot B", code="SVC-WH-B"))
+        depot_b = await service.create_warehouse(
+            WarehouseCreate(name="Depot B", code="SVC-WH-B")
+        )
 
         with pytest.raises(ConflictError):
             await service.update_warehouse(depot_b.id, WarehouseUpdate(code="SVC-WH-A"))
 
-    async def test_update_warehouse_applies_fields(self, db_session: AsyncSession) -> None:
+    async def test_update_warehouse_applies_fields(
+        self, db_session: AsyncSession
+    ) -> None:
         service = WarehouseService(db_session)
-        warehouse = await service.create_warehouse(WarehouseCreate(name="Depot", code="SVC-WH-U"))
+        warehouse = await service.create_warehouse(
+            WarehouseCreate(name="Depot", code="SVC-WH-U")
+        )
 
         updated = await service.update_warehouse(
             warehouse.id, WarehouseUpdate(name="Renamed Depot")
@@ -114,9 +126,13 @@ class TestWarehouseService:
         assert updated.name == "Renamed Depot"
         assert updated.code == "SVC-WH-U"
 
-    async def test_deactivate_warehouse_sets_inactive(self, db_session: AsyncSession) -> None:
+    async def test_deactivate_warehouse_sets_inactive(
+        self, db_session: AsyncSession
+    ) -> None:
         service = WarehouseService(db_session)
-        warehouse = await service.create_warehouse(WarehouseCreate(name="Depot", code="SVC-WH-D"))
+        warehouse = await service.create_warehouse(
+            WarehouseCreate(name="Depot", code="SVC-WH-D")
+        )
 
         deactivated = await service.deactivate_warehouse(warehouse.id)
 
@@ -136,7 +152,9 @@ class TestProductService:
 
         with pytest.raises(ConflictError):
             await service.create_product(
-                ProductCreate(sku="SVC-SKU-DUP", name="Other Widget", price=Decimal("2.00"))
+                ProductCreate(
+                    sku="SVC-SKU-DUP", name="Other Widget", price=Decimal("2.00")
+                )
             )
 
     async def test_update_product_raises_conflict_on_duplicate_sku(
@@ -153,17 +171,23 @@ class TestProductService:
         with pytest.raises(ConflictError):
             await service.update_product(product_b.id, ProductUpdate(sku="SVC-SKU-A"))
 
-    async def test_search_products_matches_partial_name(self, db_session: AsyncSession) -> None:
+    async def test_search_products_matches_partial_name(
+        self, db_session: AsyncSession
+    ) -> None:
         service = ProductService(db_session)
         await service.create_product(
-            ProductCreate(sku="SVC-SKU-SEARCH", name="Mechanical Keyboard", price=Decimal("1.00"))
+            ProductCreate(
+                sku="SVC-SKU-SEARCH", name="Mechanical Keyboard", price=Decimal("1.00")
+            )
         )
 
         results = await service.search_products("keyboard")
 
         assert any(product.sku == "SVC-SKU-SEARCH" for product in results)
 
-    async def test_deactivate_product_sets_inactive(self, db_session: AsyncSession) -> None:
+    async def test_deactivate_product_sets_inactive(
+        self, db_session: AsyncSession
+    ) -> None:
         service = ProductService(db_session)
         product = await service.create_product(
             ProductCreate(sku="SVC-SKU-D", name="Widget", price=Decimal("1.00"))
@@ -285,7 +309,10 @@ class TestInventoryCommandService:
             )
 
     async def test_record_movement_raises_not_found_for_missing_product(
-        self, db_session: AsyncSession, event_publisher: EventPublisher, test_warehouse: Warehouse
+        self,
+        db_session: AsyncSession,
+        event_publisher: EventPublisher,
+        test_warehouse: Warehouse,
     ) -> None:
         service = InventoryCommandService(db_session, event_publisher)
 
@@ -310,7 +337,9 @@ class TestInventoryCommandService:
             "app.services.alert.send_low_stock_alert_email.delay", lambda *a, **k: None
         )
         warehouse_repository = WarehouseRepository(db_session)
-        source = await warehouse_repository.create(Warehouse(name="Source", code="SVC-XFER-SRC"))
+        source = await warehouse_repository.create(
+            Warehouse(name="Source", code="SVC-XFER-SRC")
+        )
         destination = await warehouse_repository.create(
             Warehouse(name="Destination", code="SVC-XFER-DST")
         )
@@ -336,7 +365,9 @@ class TestInventoryCommandService:
 
         query_service = InventoryQueryService(db_session)
         source_stock = await query_service.get_stock_level(test_product.id, source.id)
-        destination_stock = await query_service.get_stock_level(test_product.id, destination.id)
+        destination_stock = await query_service.get_stock_level(
+            test_product.id, destination.id
+        )
         assert source_stock.quantity == 12
         assert destination_stock.quantity == 8
 
@@ -488,9 +519,9 @@ class TestAlertService:
         result = await service.evaluate_stock_level(inventory)
 
         assert result is None
-        remaining = await AlertRepository(db_session).get_active_by_product_and_warehouse(
-            test_product.id, test_warehouse.id
-        )
+        remaining = await AlertRepository(
+            db_session
+        ).get_active_by_product_and_warehouse(test_product.id, test_warehouse.id)
         assert remaining is None
 
     async def test_resolve_alert_raises_conflict_when_already_resolved(
@@ -576,7 +607,9 @@ class TestReportService:
         self, db_session: AsyncSession, test_product: Product, test_warehouse: Warehouse
     ) -> None:
         await InventoryRepository(db_session).create(
-            Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=10)
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=10
+            )
         )
         service = ReportService(db_session)
 

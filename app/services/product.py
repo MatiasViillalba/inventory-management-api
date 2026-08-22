@@ -103,7 +103,9 @@ class ProductService:
         """
         return await self.repository.search_by_name(query, skip=skip, limit=limit)
 
-    async def update_product(self, product_id: uuid.UUID, data: ProductUpdate) -> Product:
+    async def update_product(
+        self, product_id: uuid.UUID, data: ProductUpdate
+    ) -> Product:
         """Partially update an existing product.
 
         Args:

@@ -28,7 +28,9 @@ from app.models.warehouse import Warehouse
 class TestBaseModel:
     """Tests for the shared id/timestamp behavior in BaseModel."""
 
-    async def test_generates_uuid_primary_key_on_insert(self, db_session: AsyncSession) -> None:
+    async def test_generates_uuid_primary_key_on_insert(
+        self, db_session: AsyncSession
+    ) -> None:
         warehouse = Warehouse(name="Depot", code="DEP-1")
         db_session.add(warehouse)
         await db_session.commit()
@@ -36,7 +38,9 @@ class TestBaseModel:
 
         assert isinstance(warehouse.id, uuid.UUID)
 
-    async def test_sets_created_and_updated_at_on_insert(self, db_session: AsyncSession) -> None:
+    async def test_sets_created_and_updated_at_on_insert(
+        self, db_session: AsyncSession
+    ) -> None:
         warehouse = Warehouse(name="Depot", code="DEP-2")
         db_session.add(warehouse)
         await db_session.commit()
@@ -45,7 +49,9 @@ class TestBaseModel:
         assert warehouse.created_at is not None
         assert warehouse.updated_at is not None
 
-    async def test_refreshes_updated_at_on_update(self, db_session: AsyncSession) -> None:
+    async def test_refreshes_updated_at_on_update(
+        self, db_session: AsyncSession
+    ) -> None:
         warehouse = Warehouse(name="Depot", code="DEP-3")
         db_session.add(warehouse)
         await db_session.commit()
@@ -113,7 +119,9 @@ class TestInventoryModel:
     async def test_quantity_defaults_to_zero(
         self, db_session: AsyncSession, test_product: Product, test_warehouse: Warehouse
     ) -> None:
-        inventory = Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id)
+        inventory = Inventory(
+            product_id=test_product.id, warehouse_id=test_warehouse.id
+        )
         db_session.add(inventory)
         await db_session.commit()
         await db_session.refresh(inventory)
@@ -123,10 +131,18 @@ class TestInventoryModel:
     async def test_product_and_warehouse_pair_must_be_unique(
         self, db_session: AsyncSession, test_product: Product, test_warehouse: Warehouse
     ) -> None:
-        db_session.add(Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=5))
+        db_session.add(
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=5
+            )
+        )
         await db_session.commit()
 
-        db_session.add(Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=10))
+        db_session.add(
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=10
+            )
+        )
         with pytest.raises(IntegrityError):
             await db_session.commit()
 
@@ -189,8 +205,12 @@ class TestAlertModel:
 class TestUserModel:
     """Tests for the User model's defaults and constraints."""
 
-    async def test_defaults_active_non_superuser(self, db_session: AsyncSession) -> None:
-        user = User(email="new.user@example.com", hashed_password="hashed", full_name="New User")
+    async def test_defaults_active_non_superuser(
+        self, db_session: AsyncSession
+    ) -> None:
+        user = User(
+            email="new.user@example.com", hashed_password="hashed", full_name="New User"
+        )
         db_session.add(user)
         await db_session.commit()
         await db_session.refresh(user)
@@ -199,9 +219,13 @@ class TestUserModel:
         assert user.is_superuser is False
 
     async def test_email_must_be_unique(self, db_session: AsyncSession) -> None:
-        db_session.add(User(email="dup@example.com", hashed_password="hashed", full_name="First"))
+        db_session.add(
+            User(email="dup@example.com", hashed_password="hashed", full_name="First")
+        )
         await db_session.commit()
 
-        db_session.add(User(email="dup@example.com", hashed_password="hashed", full_name="Second"))
+        db_session.add(
+            User(email="dup@example.com", hashed_password="hashed", full_name="Second")
+        )
         with pytest.raises(IntegrityError):
             await db_session.commit()

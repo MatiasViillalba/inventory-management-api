@@ -61,14 +61,18 @@ class TestWarehousesEndpoints:
     async def test_create_warehouse_invalid_payload_returns_422(
         self, client: AsyncClient
     ) -> None:
-        response = await client.post("/api/v1/warehouses", json={"name": "", "code": ""})
+        response = await client.post(
+            "/api/v1/warehouses", json={"name": "", "code": ""}
+        )
 
         assert response.status_code == 422
 
     async def test_create_warehouse_duplicate_code_returns_409(
         self, client: AsyncClient
     ) -> None:
-        await client.post("/api/v1/warehouses", json={"name": "First", "code": "API-WH-DUP"})
+        await client.post(
+            "/api/v1/warehouses", json={"name": "First", "code": "API-WH-DUP"}
+        )
 
         response = await client.post(
             "/api/v1/warehouses", json={"name": "Second", "code": "API-WH-DUP"}
@@ -76,14 +80,18 @@ class TestWarehousesEndpoints:
 
         assert response.status_code == 409
 
-    async def test_get_warehouse_returns_404_when_missing(self, client: AsyncClient) -> None:
+    async def test_get_warehouse_returns_404_when_missing(
+        self, client: AsyncClient
+    ) -> None:
         response = await client.get(
             "/api/v1/warehouses/00000000-0000-0000-0000-000000000000"
         )
 
         assert response.status_code == 404
 
-    async def test_list_warehouses_active_only_filter(self, client: AsyncClient) -> None:
+    async def test_list_warehouses_active_only_filter(
+        self, client: AsyncClient
+    ) -> None:
         active = (
             await client.post(
                 "/api/v1/warehouses", json={"name": "Active", "code": "API-WH-ACT"}
@@ -102,7 +110,9 @@ class TestWarehousesEndpoints:
         assert active["code"] in codes
         assert inactive["code"] not in codes
 
-    async def test_update_warehouse_returns_updated_fields(self, client: AsyncClient) -> None:
+    async def test_update_warehouse_returns_updated_fields(
+        self, client: AsyncClient
+    ) -> None:
         created = (
             await client.post(
                 "/api/v1/warehouses", json={"name": "Old Name", "code": "API-WH-UPD"}
@@ -119,7 +129,8 @@ class TestWarehousesEndpoints:
     async def test_deactivate_warehouse_soft_deletes(self, client: AsyncClient) -> None:
         created = (
             await client.post(
-                "/api/v1/warehouses", json={"name": "To Deactivate", "code": "API-WH-DEL"}
+                "/api/v1/warehouses",
+                json={"name": "To Deactivate", "code": "API-WH-DEL"},
             )
         ).json()
 
@@ -141,7 +152,9 @@ class TestProductsEndpoints:
         assert response.status_code == 201
         assert response.json()["sku"] == "API-SKU-1"
 
-    async def test_create_product_invalid_price_returns_422(self, client: AsyncClient) -> None:
+    async def test_create_product_invalid_price_returns_422(
+        self, client: AsyncClient
+    ) -> None:
         response = await client.post(
             "/api/v1/products",
             json={"sku": "API-SKU-BAD", "name": "Widget", "price": "-1.00"},
@@ -149,7 +162,9 @@ class TestProductsEndpoints:
 
         assert response.status_code == 422
 
-    async def test_create_product_duplicate_sku_returns_409(self, client: AsyncClient) -> None:
+    async def test_create_product_duplicate_sku_returns_409(
+        self, client: AsyncClient
+    ) -> None:
         await client.post(
             "/api/v1/products",
             json={"sku": "API-SKU-DUP", "name": "Widget", "price": "1.00"},
@@ -162,10 +177,16 @@ class TestProductsEndpoints:
 
         assert response.status_code == 409
 
-    async def test_search_products_matches_name_substring(self, client: AsyncClient) -> None:
+    async def test_search_products_matches_name_substring(
+        self, client: AsyncClient
+    ) -> None:
         await client.post(
             "/api/v1/products",
-            json={"sku": "API-SKU-SEARCH", "name": "Wireless Keyboard", "price": "49.99"},
+            json={
+                "sku": "API-SKU-SEARCH",
+                "name": "Wireless Keyboard",
+                "price": "49.99",
+            },
         )
 
         response = await client.get("/api/v1/products", params={"search": "keyboard"})
@@ -376,7 +397,9 @@ class TestAlertsEndpoints:
         assert first_response.json()["status"] == "resolved"
         assert second_response.status_code == 409
 
-    async def test_get_alert_returns_404_when_missing(self, client: AsyncClient) -> None:
+    async def test_get_alert_returns_404_when_missing(
+        self, client: AsyncClient
+    ) -> None:
         response = await client.get(
             "/api/v1/alerts/00000000-0000-0000-0000-000000000000"
         )
@@ -397,7 +420,9 @@ class TestReportsEndpoints:
         data this test just set up.
         """
         async with Redis.from_url(settings.redis_url, decode_responses=True) as redis:
-            await redis.delete("cache:reports:inventory-summary", "cache:reports:valuation")
+            await redis.delete(
+                "cache:reports:inventory-summary", "cache:reports:valuation"
+            )
 
     async def test_inventory_summary_reflects_current_stock(
         self,

@@ -30,7 +30,9 @@ class Inventory(BaseModel):
 
     __tablename__ = "inventories"
     __table_args__ = (
-        UniqueConstraint("product_id", "warehouse_id", name="uq_inventory_product_warehouse"),
+        UniqueConstraint(
+            "product_id", "warehouse_id", name="uq_inventory_product_warehouse"
+        ),
     )
 
     product_id: Mapped[uuid.UUID] = mapped_column(

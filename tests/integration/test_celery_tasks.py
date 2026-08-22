@@ -51,7 +51,10 @@ from app.repositories.product import ProductRepository
 from app.repositories.user import UserRepository
 from app.tasks import monitoring as task_monitoring
 from app.tasks.alerts import _check_low_stock_levels, check_low_stock_levels
-from app.tasks.notifications import _send_low_stock_alert_email, send_low_stock_alert_email
+from app.tasks.notifications import (
+    _send_low_stock_alert_email,
+    send_low_stock_alert_email,
+)
 from app.tasks.reports import ReportKind, _generate_report_csv, generate_report_csv
 
 
@@ -250,7 +253,9 @@ class TestGenerateReportCsvTask:
 
         monkeypatch.setattr(get_settings(), "reports_storage_dir", str(tmp_path))
         await InventoryRepository(db_session).create(
-            Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=7)
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=7
+            )
         )
 
         result = await _generate_report_csv(ReportKind.INVENTORY_SUMMARY)
@@ -260,7 +265,9 @@ class TestGenerateReportCsvTask:
         assert file_path.exists()
         with file_path.open(newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
-        matching = next(row for row in rows if row["warehouse_id"] == str(test_warehouse.id))
+        matching = next(
+            row for row in rows if row["warehouse_id"] == str(test_warehouse.id)
+        )
         assert matching["total_quantity"] == "7"
 
     async def test_generates_valuation_csv(
@@ -276,7 +283,9 @@ class TestGenerateReportCsvTask:
 
         monkeypatch.setattr(get_settings(), "reports_storage_dir", str(tmp_path))
         await InventoryRepository(db_session).create(
-            Inventory(product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=4)
+            Inventory(
+                product_id=test_product.id, warehouse_id=test_warehouse.id, quantity=4
+            )
         )
 
         result = await _generate_report_csv(ReportKind.VALUATION)
@@ -285,18 +294,24 @@ class TestGenerateReportCsvTask:
         file_path = Path(result["file_path"])
         with file_path.open(newline="", encoding="utf-8") as handle:
             rows = list(csv.DictReader(handle))
-        matching = next(row for row in rows if row["warehouse_id"] == str(test_warehouse.id))
+        matching = next(
+            row for row in rows if row["warehouse_id"] == str(test_warehouse.id)
+        )
         assert Decimal(matching["total_value"]) == test_product.price * 4
 
 
 class TestTaskMonitoringSignals:
     """Tests for the Celery signal handlers that log task lifecycle events."""
 
-    def test_prerun_and_postrun_log_duration(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_prerun_and_postrun_log_duration(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         dummy_task = SimpleNamespace(name="app.tasks.demo.dummy_task")
         with caplog.at_level(logging.INFO, logger="app.tasks.monitoring"):
             task_monitoring._on_task_prerun(task_id="task-1", task=dummy_task)
-            task_monitoring._on_task_postrun(task_id="task-1", task=dummy_task, state="SUCCESS")
+            task_monitoring._on_task_postrun(
+                task_id="task-1", task=dummy_task, state="SUCCESS"
+            )
 
         messages = [record.message for record in caplog.records]
         assert any("Task started" in message for message in messages)
@@ -306,7 +321,9 @@ class TestTaskMonitoringSignals:
         assert finished_record.duration_ms is not None
         assert finished_record.duration_ms >= 0
 
-    def test_failure_logs_at_error_level(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_failure_logs_at_error_level(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         dummy_task = SimpleNamespace(name="app.tasks.demo.dummy_task")
         with caplog.at_level(logging.ERROR, logger="app.tasks.monitoring"):
             task_monitoring._on_task_failure(
@@ -315,7 +332,9 @@ class TestTaskMonitoringSignals:
 
         assert any(record.levelno == logging.ERROR for record in caplog.records)
 
-    def test_retry_logs_at_warning_level(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_retry_logs_at_warning_level(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         dummy_task = SimpleNamespace(name="app.tasks.demo.dummy_task")
         dummy_request = SimpleNamespace(id="task-3")
         with caplog.at_level(logging.WARNING, logger="app.tasks.monitoring"):

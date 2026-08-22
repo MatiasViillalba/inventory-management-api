@@ -1,0 +1,129 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel a still-running workflow for the same branch/PR when a new
+# commit supersedes it, instead of letting both run to completion.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  lint:
+    name: Lint (ruff, black, mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
+      - name: Ruff (lint)
+        run: ruff check app tests
+
+      - name: Black (formatting)
+        run: black --check app tests
+
+      - name: Mypy (type checking)
+        run: mypy app
+
+  test:
+    name: Test (pytest)
+    runs-on: ubuntu-latest
+
+    # Mirrors docker-compose.yml's postgres/redis services: same images,
+    # same credentials shape, so a workflow failure here reflects an
+    # environment close to what docker-compose actually runs.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: inventory_user
+          POSTGRES_PASSWORD: ci_test_password
+          POSTGRES_DB: inventory_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U inventory_user -d inventory_db"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://inventory_user:ci_test_password@localhost:5432/inventory_db
+      REDIS_URL: redis://localhost:6379/0
+      CELERY_BROKER_URL: redis://localhost:6379/1
+      CELERY_RESULT_BACKEND: redis://localhost:6379/2
+      SECRET_KEY: ci-test-secret-key
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements/dev.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements/dev.txt
+
+      # tests/conftest.py creates the schema itself via Base.metadata
+      # (see _test_schema), but it expects the *database* named
+      # "inventory_db_test" (its DATABASE_URL + "_test" convention) to
+      # already exist — the postgres service above only creates
+      # POSTGRES_DB ("inventory_db") on startup.
+      - name: Create test database
+        env:
+          PGPASSWORD: ci_test_password
+        run: psql -h localhost -U inventory_user -d inventory_db -c "CREATE DATABASE inventory_db_test;"
+
+      - name: Run tests with coverage
+        run: pytest --cov=app --cov-report=term-missing -q
+
+  docker-build:
+    name: Docker build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -f docker/Dockerfile -t inventory-management-api:ci .
+
+  # Single required status check for branch protection, instead of
+  # having to list all three jobs above individually.
+  ci:
+    name: CI
+    if: always()
+    needs: [lint, test, docker-build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check job results
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ]; then
+            echo "One or more required jobs failed."
+            exit 1
+          fi
