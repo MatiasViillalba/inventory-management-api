@@ -20,27 +20,27 @@ trail, and a fully asynchronous stack from the HTTP layer down to the
 database driver.
 
 **Live API docs:** once deployed, the interactive Swagger UI is served at
-`/docs` (see [API Documentation](#api-documentation)).
+`/docs` (see [API Documentation](#-api-documentation)).
 
 ---
 
 ## Table of Contents
 
-- [The Problem](#the-problem)
-- [Features](#features)
-- [Architecture](#architecture)
-- [Tech Stack](#tech-stack)
-- [Project Structure](#project-structure)
-- [Getting Started](#getting-started)
+- [The Problem](#-the-problem)
+- [Features](#-features)
+- [Architecture](#️-architecture)
+- [Tech Stack](#️-tech-stack)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
   - [Option A: Docker Compose (recommended)](#option-a-docker-compose-recommended)
   - [Option B: Local development](#option-b-local-development)
-- [Environment Variables](#environment-variables)
-- [API Documentation](#api-documentation)
-- [Testing](#testing)
-- [CI/CD](#cicd)
-- [License](#license)
+- [Environment Variables](#️-environment-variables)
+- [API Documentation](#-api-documentation)
+- [Testing](#-testing)
+- [CI/CD](#-cicd)
+- [License](#-license)
 
-## The Problem
+## 🎯 The Problem
 
 A company operating several warehouses needs to know, at any moment, how
 much of each product it holds and where — without waiting on a nightly
@@ -50,7 +50,7 @@ low-stock alert automatically when it crosses a threshold, is recorded in
 an immutable history for audit purposes, and is pushed to connected
 clients in real time over WebSockets.
 
-## Features
+## ✨ Features
 
 - **Multi-warehouse stock control** — add, remove, and transfer stock
   between warehouses, with row-level locking so concurrent movements on
@@ -83,7 +83,7 @@ clients in real time over WebSockets.
   request id threaded through every log line for a single request's
   lifecycle.
 
-## Architecture
+## 🏗️ Architecture
 
 The write side of the Inventory aggregate is split from the read side
 (CQRS). After a movement commits, `InventoryCommandService` reconciles
@@ -170,7 +170,7 @@ sequenceDiagram
 | Two separate SQLAlchemy engines (`engine` / `task_engine`) | Uvicorn keeps one event loop for the process's life (a pooled engine is safe); Celery gives every task a fresh loop via `asyncio.run()`, so its engine uses `NullPool` — a pooled asyncpg connection handed back across two different loops fails reliably on Windows otherwise. |
 | Redis pub/sub between the event listener and WebSocket broadcast | `ConnectionManager` only knows about connections accepted by its own process. Publishing to Redis instead of calling it directly means a broadcast triggered on one API process reaches WebSocket clients connected to *any* process. |
 
-## Tech Stack
+## 🛠️ Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -187,7 +187,7 @@ sequenceDiagram
 | Containers | Docker (multi-stage build), Docker Compose |
 | CI/CD | GitHub Actions |
 
-## Project Structure
+## 📁 Project Structure
 
 ```text
 app/
@@ -217,7 +217,7 @@ docker-compose.yml            # Full local stack (postgres, redis, mailpit, api,
 .github/workflows/ci.yml      # Lint, test, and Docker-build pipeline
 ```
 
-## Getting Started
+## 🚀 Getting Started
 
 ### Option A: Docker Compose (recommended)
 
@@ -264,7 +264,7 @@ celery -A app.tasks.celery_app worker --loglevel=info
 celery -A app.tasks.celery_app beat --loglevel=info
 ```
 
-## Environment Variables
+## ⚙️ Environment Variables
 
 All variables are documented with example values in
 [`.env.example`](.env.example). The application fails fast at startup if a
@@ -284,7 +284,7 @@ required one (`DATABASE_URL`, `REDIS_URL`, `CELERY_BROKER_URL`,
 | `SMTP_HOST` / `SMTP_PORT` | Where low-stock alert emails are sent | `localhost:1025` (Mailpit) |
 | `REPORTS_STORAGE_DIR` | Where generated CSV reports are written | `storage/reports` |
 
-## API Documentation
+## 📖 API Documentation
 
 Interactive documentation is generated automatically from the code
 (FastAPI + Pydantic) and served at `/docs` (Swagger UI) and `/redoc`
@@ -307,7 +307,7 @@ shape (see `app/core/error_handlers.py`), with the exact 4xx codes each
 endpoint can return declared in its OpenAPI `responses` (visible in
 Swagger UI, not just in a docstring).
 
-## Testing
+## 🧪 Testing
 
 ```bash
 pytest                              # full suite
@@ -328,7 +328,7 @@ As of this commit: **108 tests, ~88% statement coverage** across models,
 repositories, services, API endpoints, Celery tasks, and the WebSocket
 connection/broadcast path.
 
-## CI/CD
+## 🔁 CI/CD
 
 Every push and pull request against `main` runs (see
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml)):
@@ -338,6 +338,6 @@ Every push and pull request against `main` runs (see
    containers.
 3. **Docker build** — validates `docker/Dockerfile` still builds.
 
-## License
+## 📄 License
 
 MIT — see [LICENSE](LICENSE).
