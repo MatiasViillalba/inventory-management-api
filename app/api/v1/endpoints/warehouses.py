@@ -16,6 +16,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.responses import CONFLICT, NOT_FOUND
 from app.core.session import get_db
 from app.schemas.warehouse import WarehouseCreate, WarehouseRead, WarehouseUpdate
 from app.services.warehouse import WarehouseService
@@ -49,7 +50,7 @@ async def list_warehouses(
     return [WarehouseRead.model_validate(warehouse) for warehouse in warehouses]
 
 
-@router.get("/{warehouse_id}", response_model=WarehouseRead)
+@router.get("/{warehouse_id}", response_model=WarehouseRead, responses=NOT_FOUND)
 async def get_warehouse(
     warehouse_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -72,7 +73,12 @@ async def get_warehouse(
     return WarehouseRead.model_validate(warehouse)
 
 
-@router.post("", response_model=WarehouseRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=WarehouseRead,
+    status_code=status.HTTP_201_CREATED,
+    responses=CONFLICT,
+)
 async def create_warehouse(
     data: WarehouseCreate,
     db: AsyncSession = Depends(get_db),
@@ -95,7 +101,11 @@ async def create_warehouse(
     return WarehouseRead.model_validate(warehouse)
 
 
-@router.put("/{warehouse_id}", response_model=WarehouseRead)
+@router.put(
+    "/{warehouse_id}",
+    response_model=WarehouseRead,
+    responses={**NOT_FOUND, **CONFLICT},
+)
 async def update_warehouse(
     warehouse_id: uuid.UUID,
     data: WarehouseUpdate,
@@ -122,7 +132,7 @@ async def update_warehouse(
     return WarehouseRead.model_validate(warehouse)
 
 
-@router.delete("/{warehouse_id}", response_model=WarehouseRead)
+@router.delete("/{warehouse_id}", response_model=WarehouseRead, responses=NOT_FOUND)
 async def deactivate_warehouse(
     warehouse_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

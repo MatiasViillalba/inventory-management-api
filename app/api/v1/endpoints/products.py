@@ -16,6 +16,7 @@ import uuid
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.responses import CONFLICT, NOT_FOUND
 from app.core.session import get_db
 from app.schemas.product import ProductCreate, ProductRead, ProductUpdate
 from app.services.product import ProductService
@@ -56,7 +57,7 @@ async def list_products(
     return [ProductRead.model_validate(product) for product in products]
 
 
-@router.get("/{product_id}", response_model=ProductRead)
+@router.get("/{product_id}", response_model=ProductRead, responses=NOT_FOUND)
 async def get_product(
     product_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -79,7 +80,12 @@ async def get_product(
     return ProductRead.model_validate(product)
 
 
-@router.post("", response_model=ProductRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ProductRead,
+    status_code=status.HTTP_201_CREATED,
+    responses=CONFLICT,
+)
 async def create_product(
     data: ProductCreate,
     db: AsyncSession = Depends(get_db),
@@ -102,7 +108,11 @@ async def create_product(
     return ProductRead.model_validate(product)
 
 
-@router.put("/{product_id}", response_model=ProductRead)
+@router.put(
+    "/{product_id}",
+    response_model=ProductRead,
+    responses={**NOT_FOUND, **CONFLICT},
+)
 async def update_product(
     product_id: uuid.UUID,
     data: ProductUpdate,
@@ -129,7 +139,7 @@ async def update_product(
     return ProductRead.model_validate(product)
 
 
-@router.delete("/{product_id}", response_model=ProductRead)
+@router.delete("/{product_id}", response_model=ProductRead, responses=NOT_FOUND)
 async def deactivate_product(
     product_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

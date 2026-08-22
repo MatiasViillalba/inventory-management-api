@@ -19,6 +19,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_event_publisher
+from app.api.v1.responses import INSUFFICIENT_STOCK, NOT_FOUND
 from app.core.session import get_db
 from app.events.base import EventPublisher
 from app.schemas.inventory import InventoryRead
@@ -64,7 +65,11 @@ async def list_inventory(
     return [InventoryRead.model_validate(record) for record in records]
 
 
-@router.get("/{product_id}/{warehouse_id}", response_model=InventoryRead)
+@router.get(
+    "/{product_id}/{warehouse_id}",
+    response_model=InventoryRead,
+    responses=NOT_FOUND,
+)
 async def get_stock_level(
     product_id: uuid.UUID,
     warehouse_id: uuid.UUID,
@@ -90,7 +95,12 @@ async def get_stock_level(
     return InventoryRead.model_validate(record)
 
 
-@router.post("", response_model=MovementRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=MovementRead,
+    status_code=status.HTTP_201_CREATED,
+    responses={**NOT_FOUND, **INSUFFICIENT_STOCK},
+)
 async def record_movement(
     data: MovementCreate,
     db: AsyncSession = Depends(get_db),

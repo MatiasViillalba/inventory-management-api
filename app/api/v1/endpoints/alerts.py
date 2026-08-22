@@ -18,6 +18,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_event_publisher
+from app.api.v1.responses import CONFLICT, NOT_FOUND
 from app.core.session import get_db
 from app.events.base import EventPublisher
 from app.repositories.alert import AlertRepository
@@ -58,7 +59,7 @@ async def list_alerts(
     return [AlertRead.model_validate(alert) for alert in alerts]
 
 
-@router.get("/{alert_id}", response_model=AlertRead)
+@router.get("/{alert_id}", response_model=AlertRead, responses=NOT_FOUND)
 async def get_alert(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
@@ -81,7 +82,11 @@ async def get_alert(
     return AlertRead.model_validate(alert)
 
 
-@router.post("/{alert_id}/resolve", response_model=AlertRead)
+@router.post(
+    "/{alert_id}/resolve",
+    response_model=AlertRead,
+    responses={**NOT_FOUND, **CONFLICT},
+)
 async def resolve_alert(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),

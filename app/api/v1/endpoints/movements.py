@@ -16,6 +16,7 @@ import uuid
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.v1.responses import NOT_FOUND
 from app.core.session import get_db
 from app.repositories.movement import MovementRepository
 from app.schemas.movement import MovementRead
@@ -58,7 +59,7 @@ async def list_movements(
     return [MovementRead.model_validate(movement) for movement in movements]
 
 
-@router.get("/{movement_id}", response_model=MovementRead)
+@router.get("/{movement_id}", response_model=MovementRead, responses=NOT_FOUND)
 async def get_movement(
     movement_id: uuid.UUID,
     db: AsyncSession = Depends(get_db),
