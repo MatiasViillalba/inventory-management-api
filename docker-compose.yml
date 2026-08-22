@@ -1,3 +1,22 @@
+# Shared connection settings for every container that runs the
+# application image (api, migrate, celery_worker, celery_beat). Defined
+# once here and merged into each service's `environment` block so the
+# four never drift out of sync with each other. These override whatever
+# DATABASE_URL/REDIS_URL/etc. .env holds for host-side tooling (e.g.
+# `alembic upgrade head` run directly from a dev shell), since values
+# in .env point at the ports this compose file publishes to the host
+# (localhost, or the WSL VM IP on Docker Desktop for Windows), which
+# are not reachable by name from inside the compose network — container
+# code must instead address postgres/redis/mailpit by their service
+# name, which Compose resolves via its internal DNS.
+x-app-env: &app-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+  REDIS_URL: redis://redis:6379/0
+  CELERY_BROKER_URL: redis://redis:6379/1
+  CELERY_RESULT_BACKEND: redis://redis:6379/2
+  SMTP_HOST: mailpit
+  SMTP_PORT: 1025
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -35,9 +54,128 @@ services:
     networks:
       - inventory_network
 
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: inventory_mailpit
+    restart: unless-stopped
+    ports:
+      - "8025:8025" # Web UI for viewing caught emails
+      - "1025:1025" # SMTP endpoint app/core/email.py sends to
+    networks:
+      - inventory_network
+
+  # One-shot container that applies Alembic migrations and exits.
+  # api/celery_worker/celery_beat all depend on it completing
+  # successfully rather than each racing to migrate the schema
+  # themselves on startup.
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: inventory_migrate
+    command: [ "alembic", "upgrade", "head" ]
+    env_file:
+      - .env
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - inventory_network
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: inventory_api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      <<: *app-env
+    ports:
+      - "8000:8000"
+    volumes:
+      - reports_data:/app/storage/reports
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - inventory_network
+
+  celery_worker:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: inventory_celery_worker
+    restart: unless-stopped
+    command: [ "celery", "-A", "app.tasks.celery_app", "worker", "--loglevel=info" ]
+    env_file:
+      - .env
+    environment:
+      <<: *app-env
+    volumes:
+      - reports_data:/app/storage/reports
+    # Overrides the Dockerfile's baked-in HEALTHCHECK, which curls a
+    # web port this container never listens on (it runs a Celery
+    # worker, not Uvicorn). `inspect ping` asks this container's own
+    # worker process to respond over the broker instead.
+    healthcheck:
+      test: [ "CMD", "celery", "-A", "app.tasks.celery_app", "inspect", "ping" ]
+      interval: 30s
+      timeout: 10s
+      start_period: 15s
+      retries: 3
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - inventory_network
+
+  # Celery Beat only ticks the schedule (see celery_app.conf.beat_schedule)
+  # and enqueues tasks for celery_worker to run; it never touches
+  # reports_data itself.
+  celery_beat:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: inventory_celery_beat
+    restart: unless-stopped
+    command: [ "celery", "-A", "app.tasks.celery_app", "beat", "--loglevel=info" ]
+    env_file:
+      - .env
+    environment:
+      <<: *app-env
+    # Beat only ticks a schedule; it doesn't run a worker to answer
+    # `inspect ping` and doesn't listen on a web port either, so the
+    # Dockerfile's baked-in HEALTHCHECK doesn't apply here — there's no
+    # equivalent liveness signal to check beyond "is the process up",
+    # which `restart: unless-stopped` already covers.
+    healthcheck:
+      disable: true
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    networks:
+      - inventory_network
+
 volumes:
   postgres_data:
   redis_data:
+  reports_data:
 
 networks:
   inventory_network:

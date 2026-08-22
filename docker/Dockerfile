@@ -61,6 +61,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 COPY --from=builder /opt/venv /opt/venv
 
 WORKDIR /app
+# WORKDIR alone leaves /app itself owned by root, even though the
+# --chown below covers what's copied into it — and Celery Beat writes
+# its celerybeat-schedule file directly into the working directory, so
+# without this it fails with "Permission denied" once running as
+# appuser.
+RUN chown appuser:appuser /app
+
 COPY --chown=appuser:appuser app ./app
 COPY --chown=appuser:appuser migrations ./migrations
 COPY --chown=appuser:appuser alembic.ini ./alembic.ini
