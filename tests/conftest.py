@@ -25,11 +25,13 @@ from decimal import Decimal
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from app.api.deps import get_db
 from app.core.base import Base
+from app.core.cache import get_redis
 from app.core.config import get_settings
 from app.core.security import create_access_token, hash_password
 from app.main import app
@@ -121,6 +123,14 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     server, so no socket is opened and the app's `lifespan` (scheduler,
     Redis pub/sub relay) never starts.
 
+    Also overrides `get_redis` with a connection opened fresh for this
+    test instead of reusing app.core.cache's process-wide connection
+    pool: that pool's internal asyncio locks bind to whichever event
+    loop first uses it, and pytest-asyncio gives each test function its
+    own loop, so reusing the real pool across tests raises "Event loop
+    is closed" the moment a second test touches a Redis-backed route
+    (e.g. the cached /reports endpoints).
+
     Args:
         db_session: The transactional session to inject in place of
             the real `get_db` dependency.
@@ -132,7 +142,12 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     async def _override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
+    async def _override_get_redis() -> AsyncGenerator[Redis, None]:
+        async with Redis.from_url(settings.redis_url, decode_responses=True) as redis_client:
+            yield redis_client
+
     app.dependency_overrides[get_db] = _override_get_db
+    app.dependency_overrides[get_redis] = _override_get_redis
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://testserver") as async_client:
         yield async_client
